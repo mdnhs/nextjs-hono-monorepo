@@ -77,6 +77,9 @@ app.get("/", (c) => {
       cart: "/api/cart",
       orders: "/api/orders",
       reviews: "/api/reviews",
+      categories: "/api/categories",
+      swagger: "/swagger/ui",
+      openapi: "/swagger/doc",
     },
   });
 });
@@ -92,6 +95,7 @@ app.route("/api/cart", cartRouter);
 app.route("/api/orders", ordersRouter);
 app.route("/api/reviews", reviewsRouter);
 app.route("/api/categories", categoryRoutes);
+app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");
 

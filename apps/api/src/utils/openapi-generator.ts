@@ -710,7 +710,7 @@ function buildPaths(): OpenAPIV3.PathsObject {
           name,
           in: 'path' as const,
           required: true,
-          schema: { type: param.type as OpenAPIV3.SchemaObject['type'] },
+          schema: { type: param.type as OpenAPIV3.NonArraySchemaObjectType },
           description: param.description,
         })
       )
@@ -722,7 +722,7 @@ function buildPaths(): OpenAPIV3.PathsObject {
         ...Object.entries(route.query).map(([name, param]) => ({
           name,
           in: 'query' as const,
-          schema: { type: param.type as OpenAPIV3.SchemaObject['type'] },
+          schema: { type: param.type as OpenAPIV3.NonArraySchemaObjectType },
           description: param.description,
         })),
       ]
