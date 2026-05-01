@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('🌱 Starting seed...')
 
-  // Create categories first
+  // Create categories
   const electronics = await prisma.category.upsert({
     where: { slug: 'electronics' },
     update: {},
@@ -39,6 +39,107 @@ async function main() {
 
   console.log('✅ Created categories')
 
+  // Create default plans
+  const plans = [
+    {
+      id: 'plan_starter',
+      name: 'Starter',
+      slug: 'starter',
+      description: 'Perfect for new sellers getting started',
+      priceMonthly: 0,
+      priceYearly: 0,
+      trialDays: 14,
+      maxStores: 1,
+      maxProducts: 50,
+      maxOrders: 100,
+      maxStorageMB: 100,
+      customDomain: false,
+      analytics: false,
+      prioritySupport: false,
+      removeBranding: false,
+      apiAccess: false,
+    },
+    {
+      id: 'plan_basic',
+      name: 'Basic',
+      slug: 'basic',
+      description: 'For growing businesses',
+      priceMonthly: 9.99,
+      priceYearly: 99.99,
+      trialDays: 0,
+      maxStores: 1,
+      maxProducts: 200,
+      maxOrders: 500,
+      maxStorageMB: 500,
+      customDomain: false,
+      analytics: true,
+      prioritySupport: false,
+      removeBranding: false,
+      apiAccess: false,
+    },
+    {
+      id: 'plan_pro',
+      name: 'Pro',
+      slug: 'pro',
+      description: 'For established sellers',
+      priceMonthly: 29.99,
+      priceYearly: 299.99,
+      trialDays: 0,
+      maxStores: 3,
+      maxProducts: 1000,
+      maxOrders: null,
+      maxStorageMB: 2000,
+      customDomain: true,
+      analytics: true,
+      prioritySupport: false,
+      removeBranding: true,
+      apiAccess: true,
+    },
+    {
+      id: 'plan_enterprise',
+      name: 'Enterprise',
+      slug: 'enterprise',
+      description: 'Unlimited scale for large businesses',
+      priceMonthly: 99.99,
+      priceYearly: 999.99,
+      trialDays: 0,
+      maxStores: null,
+      maxProducts: null,
+      maxOrders: null,
+      maxStorageMB: 10000,
+      customDomain: true,
+      analytics: true,
+      prioritySupport: true,
+      removeBranding: true,
+      apiAccess: true,
+    },
+  ]
+
+  for (const plan of plans) {
+    await prisma.plan.upsert({
+      where: { slug: plan.slug },
+      update: {},
+      create: plan,
+    })
+  }
+
+  console.log('✅ Created plans')
+
+  // Create admin user
+  const adminPassword = await hashPassword('admin123')
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
+    update: {},
+    create: {
+      email: 'admin@example.com',
+      password: adminPassword,
+      name: 'Platform Admin',
+      role: 'ADMIN',
+    },
+  })
+
+  console.log('✅ Created admin:', admin.email)
+
   // Create a test seller user
   const sellerPassword = await hashPassword('seller123')
   const seller = await prisma.user.upsert({
@@ -54,7 +155,11 @@ async function main() {
 
   console.log('✅ Created seller:', seller.email)
 
-  // Create a test store
+  // Create a test store (APPROVED so it's live)
+  const starterPlan = await prisma.plan.findUniqueOrThrow({
+    where: { slug: 'starter' },
+  })
+
   const store = await prisma.store.upsert({
     where: { slug: 'tech-gadgets-store' },
     update: {},
@@ -63,11 +168,27 @@ async function main() {
       description: 'Your one-stop shop for the latest tech gadgets',
       slug: 'tech-gadgets-store',
       ownerId: seller.id,
-      status: 'PUBLISHED',
+      status: 'APPROVED',
     },
   })
 
   console.log('✅ Created store:', store.name)
+
+  // Create subscription for the store
+  await prisma.subscription.upsert({
+    where: { storeId: store.id },
+    update: {},
+    create: {
+      storeId: store.id,
+      planId: starterPlan.id,
+      billingCycle: 'MONTHLY',
+      status: 'TRIAL',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 day trial
+    },
+  })
+
+  console.log('✅ Created subscription for store')
 
   // Create sample products
   const products = [
@@ -147,9 +268,7 @@ async function main() {
 
   for (const product of products) {
     await prisma.product.upsert({
-      where: { 
-        sku: product.sku 
-      },
+      where: { sku: product.sku },
       update: {},
       create: {
         ...product,
@@ -177,8 +296,9 @@ async function main() {
 
   console.log('🎉 Seed completed successfully!')
   console.log('\n📝 Test accounts:')
-  console.log('  Buyer: buyer@example.com / buyer123')
+  console.log('  Admin:  admin@example.com / admin123')
   console.log('  Seller: seller@example.com / seller123')
+  console.log('  Buyer:  buyer@example.com / buyer123')
 }
 
 main()

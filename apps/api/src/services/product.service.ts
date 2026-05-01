@@ -65,11 +65,11 @@ export class ProductService extends BaseService {
       ...(filters.ownerId && {
         store: { 
           ownerId: filters.ownerId,
-          ...(filters.includeUnpublishedStores ? {} : { status: 'PUBLISHED' })
+          ...(filters.includeUnpublishedStores ? {} : { status: 'APPROVED' })
         }
       }),
       ...(!filters.ownerId && !filters.includeUnpublishedStores && {
-        store: { status: 'PUBLISHED' }
+        store: { status: 'APPROVED' }
       }),
     };
 

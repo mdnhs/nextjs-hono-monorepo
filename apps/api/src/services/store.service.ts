@@ -6,6 +6,8 @@ export interface CreateStoreData {
   description?: string
   slug: string
   logo?: string
+  planId?: string
+  customDomain?: string
 }
 
 export interface UpdateStoreData {
@@ -14,6 +16,7 @@ export interface UpdateStoreData {
   slug?: string
   logo?: string
   status?: StoreStatus
+  customDomain?: string | null
 }
 
 export interface StoreFilters {
@@ -29,9 +32,14 @@ export interface PaginationParams {
 export class StoreService {
   async getAllStores(filters: StoreFilters, pagination: PaginationParams) {
     const skip = (pagination.page - 1) * pagination.limit
-    const where = filters.status 
-      ? { status: filters.status }
-      : { status: StoreStatus.PUBLISHED }
+    const where: Record<string, unknown> = {}
+    
+    if (filters.status) {
+      where.status = filters.status
+    }
+    if (filters.ownerId) {
+      where.ownerId = filters.ownerId
+    }
     
     const [stores, total] = await Promise.all([
       prisma.store.findMany({
@@ -49,6 +57,19 @@ export class StoreService {
           _count: {
             select: {
               products: true
+            }
+          },
+          subscriptions: {
+            include: {
+              plan: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  priceMonthly: true,
+                  priceYearly: true,
+                }
+              }
             }
           }
         },
@@ -91,6 +112,11 @@ export class StoreService {
             products: true,
             orders: true
           }
+        },
+        subscriptions: {
+          include: {
+            plan: true,
+          }
         }
       }
     })
@@ -131,8 +157,8 @@ export class StoreService {
       throw new Error('Store not found')
     }
     
-    if (store.status !== StoreStatus.PUBLISHED) {
-      throw new Error('Store is not published')
+    if (store.status !== StoreStatus.APPROVED) {
+      throw new Error('Store is not approved')
     }
     
     return store
@@ -152,6 +178,19 @@ export class StoreService {
             select: {
               products: true,
               orders: true
+            }
+          },
+          subscriptions: {
+            include: {
+              plan: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  priceMonthly: true,
+                  priceYearly: true,
+                }
+              }
             }
           }
         },
@@ -181,21 +220,68 @@ export class StoreService {
     if (existingStore) {
       throw new Error('Slug already exists')
     }
+
+    if (data.customDomain) {
+      const existingDomain = await prisma.store.findUnique({
+        where: { customDomain: data.customDomain }
+      })
+      if (existingDomain) {
+        throw new Error('Custom domain already in use')
+      }
+    }
     
-    const store = await prisma.store.create({
-      data: {
-        ...data,
-        ownerId
-      },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+    const store = await prisma.$transaction(async (tx) => {
+      const newStore = await tx.store.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          slug: data.slug,
+          logo: data.logo,
+          ownerId,
+          status: StoreStatus.PENDING,
+          customDomain: data.customDomain || null,
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
           }
         }
+      })
+
+      if (data.planId) {
+        const plan = await tx.plan.findUnique({
+          where: { id: data.planId },
+        })
+        if (plan) {
+          const now = new Date()
+          let currentPeriodEnd = new Date(now)
+          let status = 'TRIAL'
+
+          if (plan.trialDays > 0) {
+            currentPeriodEnd = new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+          } else {
+            currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1)
+            status = 'ACTIVE'
+          }
+
+          await tx.subscription.create({
+            data: {
+              storeId: newStore.id,
+              planId: plan.id,
+              billingCycle: 'MONTHLY',
+              status: status as any,
+              currentPeriodStart: now,
+              currentPeriodEnd,
+            },
+          })
+        }
       }
+
+      return newStore
     })
     
     return store
@@ -224,6 +310,18 @@ export class StoreService {
       
       if (existingStore) {
         throw new Error('Slug already exists')
+      }
+    }
+
+    if (data.customDomain) {
+      const existingDomain = await prisma.store.findFirst({
+        where: {
+          customDomain: data.customDomain,
+          id: { not: id }
+        }
+      })
+      if (existingDomain) {
+        throw new Error('Custom domain already in use')
       }
     }
     
@@ -263,8 +361,9 @@ export class StoreService {
     
     return { message: 'Store deleted successfully' }
   }
-  
-  async publishStore(id: string, userId: string, userRole: UserRole) {
+
+  // Admin: Approve a store
+  async approveStore(id: string, _adminId: string) {
     const store = await prisma.store.findUnique({
       where: { id }
     })
@@ -272,14 +371,14 @@ export class StoreService {
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    if (store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error('Not authorized to publish this store')
+
+    if (store.status === StoreStatus.APPROVED) {
+      throw new Error('Store is already approved')
     }
     
-    const publishedStore = await prisma.store.update({
+    const approvedStore = await prisma.store.update({
       where: { id },
-      data: { status: StoreStatus.PUBLISHED },
+      data: { status: StoreStatus.APPROVED },
       include: {
         owner: {
           select: {
@@ -291,10 +390,11 @@ export class StoreService {
       }
     })
     
-    return publishedStore
+    return approvedStore
   }
-  
-  async unpublishStore(id: string, userId: string, userRole: UserRole) {
+
+  // Admin: Reject a store
+  async rejectStore(id: string, _adminId: string) {
     const store = await prisma.store.findUnique({
       where: { id }
     })
@@ -303,13 +403,9 @@ export class StoreService {
       throw new Error('Store not found')
     }
     
-    if (store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error('Not authorized to unpublish this store')
-    }
-    
-    const unpublishedStore = await prisma.store.update({
+    const rejectedStore = await prisma.store.update({
       where: { id },
-      data: { status: StoreStatus.DRAFT },
+      data: { status: StoreStatus.REJECTED },
       include: {
         owner: {
           select: {
@@ -321,7 +417,34 @@ export class StoreService {
       }
     })
     
-    return unpublishedStore
+    return rejectedStore
+  }
+
+  // Admin: Suspend a store
+  async suspendStore(id: string, _adminId: string) {
+    const store = await prisma.store.findUnique({
+      where: { id }
+    })
+    
+    if (!store) {
+      throw new Error('Store not found')
+    }
+    
+    const suspendedStore = await prisma.store.update({
+      where: { id },
+      data: { status: StoreStatus.SUSPENDED },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    })
+    
+    return suspendedStore
   }
 }
 

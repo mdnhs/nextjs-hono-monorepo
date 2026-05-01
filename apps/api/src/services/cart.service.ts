@@ -73,7 +73,7 @@ export class CartService extends BaseService {
       throw new Error("Product is not available");
     }
 
-    if (product.store.status !== "PUBLISHED") {
+    if (product.store.status !== "APPROVED") {
       throw new Error("Store is not available");
     }
 

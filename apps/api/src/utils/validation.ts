@@ -5,7 +5,7 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(2),
-  role: z.nativeEnum(UserRole).optional().default(UserRole.BUYER)
+  role: z.nativeEnum(UserRole).optional().default(UserRole.SELLER)
 })
 
 export const loginSchema = z.object({
@@ -17,7 +17,9 @@ export const createStoreSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
-  logo: z.string().url().optional()
+  logo: z.string().url().optional(),
+  planId: z.string().optional(),
+  customDomain: z.string().optional(),
 })
 
 export const updateStoreSchema = z.object({
@@ -25,7 +27,8 @@ export const updateStoreSchema = z.object({
   description: z.string().optional(),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
   logo: z.string().url().optional(),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'SUSPENDED']).optional()
+  customDomain: z.string().nullable().optional(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED']).optional()
 })
 
 export const createProductSchema = z.object({

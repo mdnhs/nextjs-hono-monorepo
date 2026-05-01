@@ -21,7 +21,7 @@ describe("CartService", () => {
     id: mockStoreId,
     name: faker.company.name(),
     slug: faker.internet.domainWord(),
-    status: StoreStatus.PUBLISHED,
+    status: StoreStatus.APPROVED,
   };
 
   const mockProduct = {
@@ -240,7 +240,7 @@ describe("CartService", () => {
     it("should throw error when store is not published", async () => {
       (prisma.product.findUnique as any).mockResolvedValue({
         ...mockProduct,
-        store: { ...mockStore, status: StoreStatus.DRAFT },
+        store: { ...mockStore, status: StoreStatus.PENDING },
       });
 
       await expect(

@@ -12,6 +12,8 @@ import cartRouter from "./routes/cart";
 import ordersRouter from "./routes/orders";
 import reviewsRouter from "./routes/reviews";
 import categoryRoutes from "./routes/category.routes";
+import planRouter from "./routes/plans";
+import adminRouter from "./routes/admin";
 import swaggerRouter from "./routes/swagger";
 
 dotenv.config();
@@ -20,39 +22,29 @@ const app = new Hono();
 
 app.use("*", logger());
 
-// Configure CORS for frontend integration
 app.use(
   "*",
   cors({
     origin: (origin) => {
-      // Allow requests from these origins
       const allowedOrigins = [
-        "http://localhost:3001", // Frontend dev server
-        "http://localhost:3000", // Alternative frontend port
-        "https://localhost:3001", // HTTPS dev
+        "http://localhost:3001",
+        "http://localhost:3000",
+        "https://localhost:3001",
       ];
       
-      // Allow requests with no origin (e.g., mobile apps, Postman)
       if (!origin) return null;
-      
-      // Check if origin is allowed
-      if (allowedOrigins.includes(origin)) {
-        return origin;
-      }
-      
-      // In production, you'd want to be more restrictive
-      // For development, we'll allow all localhost origins
+      if (allowedOrigins.includes(origin)) return origin;
       if (origin.startsWith("http://localhost:") || origin.startsWith("https://localhost:")) {
         return origin;
       }
       
       return null;
     },
-    credentials: true, // Allow cookies to be sent
+    credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     exposeHeaders: ["Content-Length", "X-Request-Id"],
-    maxAge: 86400, // Cache preflight requests for 24 hours
+    maxAge: 86400,
   })
 );
 
@@ -67,7 +59,7 @@ app.onError((err, c) => {
 
 app.get("/", (c) => {
   return c.json({
-    message: "E-commerce API",
+    message: "E-commerce SaaS Platform API",
     version: "1.0.0",
     endpoints: {
       health: "/health",
@@ -78,6 +70,8 @@ app.get("/", (c) => {
       orders: "/api/v1/orders",
       reviews: "/api/v1/reviews",
       categories: "/api/v1/categories",
+      plans: "/api/v1/plans",
+      admin: "/api/v1/admin",
       swagger: "/swagger/ui",
       openapi: "/swagger/doc",
     },
@@ -95,6 +89,8 @@ app.route("/api/v1/cart", cartRouter);
 app.route("/api/v1/orders", ordersRouter);
 app.route("/api/v1/reviews", reviewsRouter);
 app.route("/api/v1/categories", categoryRoutes);
+app.route("/api/v1/plans", planRouter);
+app.route("/api/v1/admin", adminRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

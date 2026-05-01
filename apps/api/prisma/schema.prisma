@@ -14,8 +14,9 @@ enum UserRole {
 }
 
 enum StoreStatus {
-  DRAFT
-  PUBLISHED
+  PENDING
+  APPROVED
+  REJECTED
   SUSPENDED
 }
 
@@ -28,12 +29,30 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+  PAST_DUE
+}
+
+enum PlanStatus {
+  ACTIVE
+  HIDDEN
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
   name      String
-  role      UserRole @default(BUYER)
+  role      UserRole @default(SELLER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -44,35 +63,87 @@ model User {
   reviewHelpfulVotes ReviewHelpful[]
 }
 
+model Plan {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  status      PlanStatus @default(ACTIVE)
+  priceMonthly Decimal   @db.Decimal(10, 2) @default(0)
+  priceYearly  Decimal   @db.Decimal(10, 2) @default(0)
+  trialDays    Int        @default(0)
+
+  maxStores       Int?
+  maxProducts     Int?
+  maxOrders       Int?
+  maxStorageMB    Int      @default(100)
+
+  customDomain    Boolean  @default(false)
+  analytics       Boolean  @default(false)
+  prioritySupport Boolean  @default(false)
+  removeBranding  Boolean  @default(false)
+  apiAccess       Boolean  @default(false)
+
+  features        Json     @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
 model Store {
   id          String      @id @default(cuid())
   name        String
   description String?
   slug        String      @unique
   logo        String?
-  status      StoreStatus @default(DRAFT)
+  status      StoreStatus @default(PENDING)
+  customDomain String?    @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
 
-  products Product[]
-  orders   Order[]
+  products      Product[]
+  orders        Order[]
+  subscriptions Subscription[]
 
   @@index([ownerId])
   @@index([status])
+  @@index([slug])
+}
+
+model Subscription {
+  id            String             @id @default(cuid())
+  status        SubscriptionStatus @default(TRIAL)
+  billingCycle  BillingCycle       @default(MONTHLY)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelledAt   DateTime?
+  expiresAt     DateTime?
+
+  storeId String    @unique
+  store   Store     @relation(fields: [storeId], references: [id])
+
+  planId  String
+  plan    Plan      @relation(fields: [planId], references: [id])
+
+  @@index([status])
+  @@index([storeId])
+  @@index([planId])
 }
 
 model Product {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  price       Decimal @db.Decimal(10, 2)
+  price       Decimal  @db.Decimal(10, 2)
   images      String[]
-  sku         String  @unique
-  quantity    Int     @default(0)
-  isActive    Boolean @default(true)
+  sku         String   @unique
+  quantity    Int      @default(0)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -186,7 +257,7 @@ model ShippingAddress {
 
 model Review {
   id            String   @id @default(cuid())
-  rating        Int      // 1-5 stars
+  rating        Int
   title         String?
   comment       String
   images        String[]
@@ -213,7 +284,7 @@ model Review {
 
 model ReviewHelpful {
   id        String   @id @default(cuid())
-  helpful   Boolean  // true for helpful, false for not helpful
+  helpful   Boolean
   createdAt DateTime @default(now())
 
   userId String

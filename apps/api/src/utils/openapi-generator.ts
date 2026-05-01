@@ -629,6 +629,277 @@ const routes: RouteInfo[] = [
       '404': { description: 'Category not found' },
     },
   },
+
+  // Plans
+  {
+    path: '/api/v1/plans',
+    method: 'get',
+    tags: ['Plans'],
+    summary: 'Get active plans',
+    responses: {
+      '200': { description: 'List of active plans' },
+    },
+  },
+  {
+    path: '/api/v1/plans/all',
+    method: 'get',
+    tags: ['Plans'],
+    summary: 'Get all plans (admin)',
+    requiresAuth: true,
+    responses: {
+      '200': { description: 'List of all plans' },
+    },
+  },
+  {
+    path: '/api/v1/plans/:id',
+    method: 'get',
+    tags: ['Plans'],
+    summary: 'Get plan by ID',
+    params: {
+      id: { type: 'string', description: 'Plan ID' },
+    },
+    responses: {
+      '200': { description: 'Plan details' },
+      '404': { description: 'Plan not found' },
+    },
+  },
+  {
+    path: '/api/v1/plans',
+    method: 'post',
+    tags: ['Plans'],
+    summary: 'Create a plan (admin)',
+    requiresAuth: true,
+    requestBody: {
+      name: { type: 'string' },
+      slug: { type: 'string' },
+      description: { type: 'string' },
+      priceMonthly: { type: 'number' },
+      priceYearly: { type: 'number' },
+      trialDays: { type: 'integer' },
+      maxStores: { type: 'integer' },
+      maxProducts: { type: 'integer' },
+      maxOrders: { type: 'integer' },
+      maxStorageMB: { type: 'integer' },
+      customDomain: { type: 'boolean' },
+      analytics: { type: 'boolean' },
+      prioritySupport: { type: 'boolean' },
+      removeBranding: { type: 'boolean' },
+      apiAccess: { type: 'boolean' },
+    },
+    responses: {
+      '201': { description: 'Plan created' },
+    },
+  },
+  {
+    path: '/api/v1/plans/:id',
+    method: 'patch',
+    tags: ['Plans'],
+    summary: 'Update a plan (admin)',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Plan ID' },
+    },
+    responses: {
+      '200': { description: 'Plan updated' },
+    },
+  },
+  {
+    path: '/api/v1/plans/:id',
+    method: 'delete',
+    tags: ['Plans'],
+    summary: 'Delete a plan (admin)',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Plan ID' },
+    },
+    responses: {
+      '200': { description: 'Plan deleted' },
+    },
+  },
+
+  // Admin
+  {
+    path: '/api/v1/admin/dashboard',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get admin dashboard stats',
+    requiresAuth: true,
+    responses: {
+      '200': { description: 'Dashboard statistics' },
+    },
+  },
+  {
+    path: '/api/v1/admin/stores',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get all stores',
+    requiresAuth: true,
+    query: {
+      status: { type: 'string', description: 'Filter by status' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of all stores' },
+    },
+  },
+  {
+    path: '/api/v1/admin/stores/pending',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get pending stores',
+    requiresAuth: true,
+    query: {
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of pending stores' },
+    },
+  },
+  {
+    path: '/api/v1/admin/stores/:id/approve',
+    method: 'post',
+    tags: ['Admin'],
+    summary: 'Approve a store',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      planId: { type: 'string', description: 'Plan ID to assign' },
+    },
+    responses: {
+      '200': { description: 'Store approved' },
+    },
+  },
+  {
+    path: '/api/v1/admin/stores/:id/reject',
+    method: 'post',
+    tags: ['Admin'],
+    summary: 'Reject a store',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Store rejected' },
+    },
+  },
+  {
+    path: '/api/v1/admin/stores/:id/suspend',
+    method: 'post',
+    tags: ['Admin'],
+    summary: 'Suspend a store',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Store suspended' },
+    },
+  },
+  {
+    path: '/api/v1/admin/users',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get all users',
+    requiresAuth: true,
+    query: {
+      role: { type: 'string', description: 'Filter by role' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of users' },
+    },
+  },
+  {
+    path: '/api/v1/admin/users/:id',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get user details',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'User ID' },
+    },
+    responses: {
+      '200': { description: 'User details' },
+    },
+  },
+  {
+    path: '/api/v1/admin/subscriptions',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get all subscriptions',
+    requiresAuth: true,
+    query: {
+      status: { type: 'string', description: 'Filter by status' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of subscriptions' },
+    },
+  },
+
+  // Store Subscriptions
+  {
+    path: '/api/v1/stores/:id/subscription',
+    method: 'get',
+    tags: ['Subscriptions'],
+    summary: 'Get store subscription',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Subscription details' },
+      '404': { description: 'Subscription not found' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:id/subscription/cancel',
+    method: 'post',
+    tags: ['Subscriptions'],
+    summary: 'Cancel store subscription',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Subscription cancelled' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:id/subscription/upgrade',
+    method: 'post',
+    tags: ['Subscriptions'],
+    summary: 'Upgrade store subscription',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      planId: { type: 'string' },
+    },
+    responses: {
+      '200': { description: 'Subscription upgraded' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:id/limits',
+    method: 'get',
+    tags: ['Subscriptions'],
+    summary: 'Get store plan limits',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Plan limits and usage' },
+    },
+  },
 ]
 
 export function generateOpenAPISpec(): OpenAPIV3.Document {
@@ -660,6 +931,9 @@ export function generateOpenAPISpec(): OpenAPIV3.Document {
       { name: 'Orders', description: 'Order management' },
       { name: 'Reviews', description: 'Product reviews' },
       { name: 'Categories', description: 'Product categories' },
+      { name: 'Plans', description: 'Subscription plans' },
+      { name: 'Admin', description: 'Admin operations' },
+      { name: 'Subscriptions', description: 'Store subscriptions' },
     ],
     paths: buildPaths(),
     components: {
