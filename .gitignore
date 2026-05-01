@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+.env*.local
+.env*.production
+.turbo/
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+**/*.log
+.vscode/settings.json
+.wrangler/

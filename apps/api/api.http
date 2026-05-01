@@ -1,0 +1,697 @@
+### API Testing File for VS Code REST Client Extension
+### Install the REST Client extension by Huachao Mao in VS Code to use this file
+
+###############################################
+### WORKFLOW FOR TESTING REVIEWS:
+### 1. Register/Login as SELLER and BUYER
+### 2. Create and publish a store (as SELLER)
+### 3. Create products in the store (as SELLER)
+### 4. Add products to cart (as BUYER)
+### 5. Checkout to create order (as BUYER)
+### 6. Update order status to DELIVERED (as SELLER)
+### 7. Create review for the product (as BUYER)
+###############################################
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+
+### Variables - Update these after getting responses
+### NOTE: Get a fresh token by logging in first if you get 401 errors
+@authToken = 
+@buyerToken = 
+@storeId = 
+@storeSlug = tech-gadgets
+@productId = 
+@productSku = TECH-001 
+
+###############################################
+### GENERAL ENDPOINTS
+###############################################
+
+### Health Check
+GET {{baseUrl}}/health
+
+### API Info
+GET {{baseUrl}}/
+
+###############################################
+### QUICK START - LOGIN TO GET FRESH TOKENS
+###############################################
+
+### Step 1: Login as SELLER (Copy token to @authToken)
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "seller@example.com",
+  "password": "password123"
+}
+
+### Step 2: Login as BUYER (Copy token to @buyerToken)  
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "buyer@example.com",
+  "password": "password123"
+}
+
+###############################################
+### AUTHENTICATION ENDPOINTS
+###############################################
+
+### Register a new BUYER
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "buyer@example.com",
+  "password": "password123",
+  "name": "John Buyer",
+  "role": "BUYER"
+}
+
+### Register a new SELLER
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "seller@example.com",
+  "password": "password123",
+  "name": "Jane Seller",
+  "role": "SELLER"
+}
+
+### Register an ADMIN
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@example.com",
+  "password": "password123",
+  "name": "Admin User",
+  "role": "ADMIN"
+}
+
+### Login as BUYER
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "buyer@example.com",
+  "password": "password123"
+}
+
+### Login as SELLER (Copy the token from response and update @authToken above)
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "seller@example.com",
+  "password": "password123"
+}
+
+### Login as ADMIN
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### Get Current User Profile (Requires authentication)
+GET {{baseUrl}}/api/auth/profile
+Authorization: Bearer {{authToken}}
+
+###############################################
+### STORE ENDPOINTS - PUBLIC
+###############################################
+
+### Get All Published Stores (No auth required)
+GET {{baseUrl}}/api/stores
+
+### Get All Stores with Pagination
+GET {{baseUrl}}/api/stores?page=1&limit=5
+
+### Get All Stores (Including DRAFT) - Admin view
+GET {{baseUrl}}/api/stores?status=DRAFT
+Authorization: Bearer {{authToken}}
+
+### Get Store by ID (Update storeId variable with actual ID)
+GET {{baseUrl}}/api/stores/{{storeId}}
+
+### Get Store by Slug
+GET {{baseUrl}}/api/stores/slug/{{storeSlug}}
+
+###############################################
+### STORE ENDPOINTS - SELLER OPERATIONS
+###############################################
+
+### Create a New Store (Requires SELLER or ADMIN role)
+POST {{baseUrl}}/api/stores
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Tech Gadgets Store",
+  "description": "Best electronics and gadgets online",
+  "slug": "tech-gadgets",
+  "logo": "https://example.com/logo.png"
+}
+
+### Create Another Store
+POST {{baseUrl}}/api/stores
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Fashion Hub",
+  "description": "Trendy clothing and accessories",
+  "slug": "fashion-hub",
+  "logo": "https://example.com/fashion-logo.png"
+}
+
+### Get My Stores (Seller's own stores)
+GET {{baseUrl}}/api/stores/my/stores
+Authorization: Bearer {{authToken}}
+
+### Get My Stores with Pagination
+GET {{baseUrl}}/api/stores/my/stores?page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+### Update Store (Update storeId with actual ID)
+PATCH {{baseUrl}}/api/stores/{{storeId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Tech Gadgets Store - Updated",
+  "description": "Best electronics, gadgets, and accessories online",
+  "status": "PUBLISHED"
+}
+
+### Update Store Slug
+PATCH {{baseUrl}}/api/stores/{{storeId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "slug": "tech-gadgets-updated"
+}
+
+### Publish Store (Make it visible to buyers)
+POST {{baseUrl}}/api/stores/{{storeId}}/publish
+Authorization: Bearer {{authToken}}
+
+### Unpublish Store (Hide from buyers)
+POST {{baseUrl}}/api/stores/{{storeId}}/unpublish
+Authorization: Bearer {{authToken}}
+
+### Delete Store (Permanent deletion)
+DELETE {{baseUrl}}/api/stores/{{storeId}}
+Authorization: Bearer {{authToken}}
+
+###############################################
+### ERROR TESTING
+###############################################
+
+### Test Invalid Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "wrong@example.com",
+  "password": "wrongpassword"
+}
+
+### Test Duplicate Email Registration
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "seller@example.com",
+  "password": "password123",
+  "name": "Duplicate User",
+  "role": "SELLER"
+}
+
+### Test Duplicate Store Slug
+POST {{baseUrl}}/api/stores
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Another Store",
+  "description": "This will fail due to duplicate slug",
+  "slug": "tech-gadgets",
+  "logo": "https://example.com/logo.png"
+}
+
+### Test Unauthorized Store Access (Try as BUYER)
+POST {{baseUrl}}/api/stores
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Unauthorized Store",
+  "description": "This should fail",
+  "slug": "unauthorized",
+  "logo": "https://example.com/logo.png"
+}
+
+### Test Missing Authentication
+GET {{baseUrl}}/api/auth/profile
+
+### Test Invalid Token
+GET {{baseUrl}}/api/auth/profile
+Authorization: Bearer invalid-token-here
+
+### Test Validation Error
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "not-an-email",
+  "password": "123",
+  "name": "A"
+}
+
+###############################################
+### PRODUCT ENDPOINTS - PUBLIC
+###############################################
+
+### Get All Products (Active products from published stores)
+GET {{baseUrl}}/api/products
+
+### Get All Products (Including inactive)
+GET {{baseUrl}}/api/products?isActive=false
+
+### Search Products
+GET {{baseUrl}}/api/products?search=laptop
+
+### Filter Products by Price Range
+GET {{baseUrl}}/api/products?minPrice=100&maxPrice=1000
+
+### Filter Products by Category (Update categoryId)
+GET {{baseUrl}}/api/products?categoryId=category-id-here
+
+### Get Products for a Specific Store
+GET {{baseUrl}}/api/stores/{{storeId}}/products
+
+### Get Product by ID
+GET {{baseUrl}}/api/products/{{productId}}
+
+### Get Product by SKU
+GET {{baseUrl}}/api/products/sku/{{productSku}}
+
+###############################################
+### PRODUCT ENDPOINTS - SELLER OPERATIONS
+###############################################
+
+### Create Product in Store (Requires SELLER auth)
+POST {{baseUrl}}/api/stores/{{storeId}}/products
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Gaming Laptop Pro",
+  "description": "High-performance gaming laptop with RTX 4090",
+  "price": 2999.99,
+  "sku": "TECH-001",
+  "quantity": 10,
+  "images": [
+    "https://example.com/laptop1.jpg",
+    "https://example.com/laptop2.jpg"
+  ],
+  "isActive": true
+}
+
+### Create Another Product
+POST {{baseUrl}}/api/stores/{{storeId}}/products
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Wireless Mouse",
+  "description": "Ergonomic wireless mouse with 3-year battery life",
+  "price": 49.99,
+  "sku": "TECH-002",
+  "quantity": 50,
+  "images": ["https://example.com/mouse.jpg"],
+  "isActive": true
+}
+
+### Update Product (Update productId)
+PATCH {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Gaming Laptop Pro - Updated",
+  "price": 2799.99,
+  "description": "Updated description with better specs"
+}
+
+### Update Product Inventory
+PATCH {{baseUrl}}/api/products/{{productId}}/inventory
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "quantity": 25
+}
+
+### Toggle Product Status (Activate/Deactivate)
+PATCH {{baseUrl}}/api/products/{{productId}}/toggle-status
+Authorization: Bearer {{authToken}}
+
+### Delete Product
+DELETE {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{authToken}}
+
+###############################################
+### PRODUCT ERROR TESTING
+###############################################
+
+### Test Duplicate SKU
+POST {{baseUrl}}/api/stores/{{storeId}}/products
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Another Product",
+  "description": "This should fail",
+  "price": 99.99,
+  "sku": "TECH-001",
+  "quantity": 5
+}
+
+### Test Invalid Price
+POST {{baseUrl}}/api/stores/{{storeId}}/products
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Invalid Product",
+  "description": "Negative price",
+  "price": -50,
+  "sku": "INVALID-001",
+  "quantity": 10
+}
+
+### Test Negative Inventory
+PATCH {{baseUrl}}/api/products/{{productId}}/inventory
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "quantity": -5
+}
+
+###############################################
+### CART ENDPOINTS
+###############################################
+
+### Get Cart (Creates one if doesn't exist)
+GET {{baseUrl}}/api/cart
+Authorization: Bearer {{authToken}}
+
+### Get Cart Summary (With store breakdown)
+GET {{baseUrl}}/api/cart/summary
+Authorization: Bearer {{authToken}}
+
+### Add Product to Cart
+POST {{baseUrl}}/api/cart/items
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "productId": "{{productId}}",
+  "quantity": 2
+}
+
+### Update Cart Item Quantity
+PATCH {{baseUrl}}/api/cart/items/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "quantity": 3
+}
+
+### Remove Item from Cart (Set quantity to 0)
+PATCH {{baseUrl}}/api/cart/items/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "quantity": 0
+}
+
+### Remove Item from Cart (Direct delete)
+DELETE {{baseUrl}}/api/cart/items/{{productId}}
+Authorization: Bearer {{authToken}}
+
+### Clear Cart
+DELETE {{baseUrl}}/api/cart/clear
+Authorization: Bearer {{authToken}}
+
+###############################################
+### ORDER ENDPOINTS
+###############################################
+
+### Checkout (Create Order from Cart)
+POST {{baseUrl}}/api/orders/checkout
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "shippingAddress": {
+    "street": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "postalCode": "10001",
+    "country": "USA",
+    "phone": "+1-555-123-4567"
+  }
+}
+
+### Get My Orders
+GET {{baseUrl}}/api/orders
+Authorization: Bearer {{authToken}}
+
+### Get My Orders (Filtered by status)
+GET {{baseUrl}}/api/orders?status=PENDING
+Authorization: Bearer {{authToken}}
+
+### Get Order by ID (Update with actual order ID)
+@orderId = 
+GET {{baseUrl}}/api/orders/{{orderId}}
+Authorization: Bearer {{authToken}}
+
+### Get Store Orders (As Seller)
+GET {{baseUrl}}/api/stores/{{storeId}}/orders
+Authorization: Bearer {{authToken}}
+
+### Update Order Status (As Seller - Process Order)
+PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "PROCESSING"
+}
+
+### Update Order Status (Ship Order)
+PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "SHIPPED"
+}
+
+### Update Order Status (Deliver Order)
+PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "DELIVERED"
+}
+
+### Cancel Order
+PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "CANCELLED"
+}
+
+### Get All Orders (Admin only)
+GET {{baseUrl}}/api/orders/all
+Authorization: Bearer {{authToken}}
+
+###############################################
+### CART ERROR TESTING
+###############################################
+
+### Test Adding Invalid Product to Cart
+POST {{baseUrl}}/api/cart/items
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "productId": "invalid-product-id",
+  "quantity": 1
+}
+
+### Test Adding Out of Stock Product
+POST {{baseUrl}}/api/cart/items
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "productId": "{{productId}}",
+  "quantity": 9999
+}
+
+### Test Checkout with Empty Cart
+POST {{baseUrl}}/api/orders/checkout
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "shippingAddress": {
+    "street": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "postalCode": "10001",
+    "country": "USA",
+    "phone": "+1-555-123-4567"
+  }
+}
+
+###############################################
+### REVIEW ENDPOINTS
+###############################################
+
+### Get Product Reviews (Public)
+GET {{baseUrl}}/api/reviews/product/{{productId}}
+
+### Get Product Reviews with Filters
+GET {{baseUrl}}/api/reviews/product/{{productId}}?rating=5&verified=true
+
+### Get Product Rating Statistics
+GET {{baseUrl}}/api/reviews/product/{{productId}}/stats
+
+### Check if User Can Review Product
+GET {{baseUrl}}/api/reviews/product/{{productId}}/can-review
+Authorization: Bearer {{authToken}}
+
+### Create Product Review (After purchase)
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 5,
+  "title": "Excellent product!",
+  "comment": "This product exceeded my expectations. Great quality and fast shipping!",
+  "images": ["https://example.com/review-image1.jpg"]
+}
+
+### Create Review with Order ID (Verified Purchase)
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 4,
+  "title": "Good but could be better",
+  "comment": "The product works well but the packaging could use improvement. Overall satisfied.",
+  "orderId": "{{orderId}}"
+}
+
+### Update Review (Update reviewId after creating a review)
+@reviewId = 
+PATCH {{baseUrl}}/api/reviews/{{reviewId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 4,
+  "comment": "Updated my review after using the product for a month. Still works great!"
+}
+
+### Delete Review
+DELETE {{baseUrl}}/api/reviews/{{reviewId}}
+Authorization: Bearer {{authToken}}
+
+### Mark Review as Helpful
+POST {{baseUrl}}/api/reviews/{{reviewId}}/helpful
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "helpful": true
+}
+
+### Mark Review as Not Helpful
+POST {{baseUrl}}/api/reviews/{{reviewId}}/helpful
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "helpful": false
+}
+
+### Get My Reviews
+GET {{baseUrl}}/api/reviews/my
+Authorization: Bearer {{authToken}}
+
+###############################################
+### REVIEW ERROR TESTING
+###############################################
+
+### Test Creating Review Without Purchase
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 3,
+  "comment": "Never bought this product but reviewing anyway"
+}
+
+### Test Invalid Rating
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 10,
+  "comment": "This rating is invalid - should be between 1 and 5"
+}
+
+### Test Short Comment
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 3,
+  "comment": "Too short"
+}
+
+### Test Duplicate Review
+POST {{baseUrl}}/api/reviews/product/{{productId}}
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "rating": 4,
+  "comment": "Trying to review the same product twice should fail if already reviewed"
+}
