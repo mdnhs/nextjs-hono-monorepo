@@ -11,6 +11,6 @@ swaggerRouter.get('/doc', (c) => {
 })
 
 // Serve Swagger UI
-swaggerRouter.get('/ui', swaggerUI({ url: '/doc' }))
+swaggerRouter.get('/ui', swaggerUI({ url: '/swagger/doc' }))
 
 export default swaggerRouter
