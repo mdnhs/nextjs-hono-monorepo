@@ -28,7 +28,7 @@ const routes: RouteInfo[] = [
 
   // Auth
   {
-    path: '/api/auth/register',
+    path: '/api/v1/auth/register',
     method: 'post',
     tags: ['Auth'],
     summary: 'Register a new user',
@@ -44,7 +44,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/auth/login',
+    path: '/api/v1/auth/login',
     method: 'post',
     tags: ['Auth'],
     summary: 'Login user',
@@ -58,7 +58,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/auth/logout',
+    path: '/api/v1/auth/logout',
     method: 'post',
     tags: ['Auth'],
     summary: 'Logout user',
@@ -68,7 +68,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/auth/profile',
+    path: '/api/v1/auth/profile',
     method: 'get',
     tags: ['Auth'],
     summary: 'Get user profile',
@@ -81,7 +81,7 @@ const routes: RouteInfo[] = [
 
   // Stores
   {
-    path: '/api/stores',
+    path: '/api/v1/stores',
     method: 'get',
     tags: ['Stores'],
     summary: 'Get all stores',
@@ -95,7 +95,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/:id',
+    path: '/api/v1/stores/:id',
     method: 'get',
     tags: ['Stores'],
     summary: 'Get store by ID',
@@ -108,7 +108,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/slug/:slug',
+    path: '/api/v1/stores/slug/:slug',
     method: 'get',
     tags: ['Stores'],
     summary: 'Get store by slug',
@@ -121,7 +121,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/my',
+    path: '/api/v1/stores/my',
     method: 'get',
     tags: ['Stores'],
     summary: 'Get user stores',
@@ -131,7 +131,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores',
+    path: '/api/v1/stores',
     method: 'post',
     tags: ['Stores'],
     summary: 'Create a store',
@@ -146,7 +146,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/:id',
+    path: '/api/v1/stores/:id',
     method: 'put',
     tags: ['Stores'],
     summary: 'Update a store',
@@ -159,7 +159,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/:id',
+    path: '/api/v1/stores/:id',
     method: 'delete',
     tags: ['Stores'],
     summary: 'Delete a store',
@@ -172,7 +172,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/:id/publish',
+    path: '/api/v1/stores/:id/publish',
     method: 'patch',
     tags: ['Stores'],
     summary: 'Publish a store',
@@ -185,7 +185,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/stores/:id/unpublish',
+    path: '/api/v1/stores/:id/unpublish',
     method: 'patch',
     tags: ['Stores'],
     summary: 'Unpublish a store',
@@ -200,7 +200,7 @@ const routes: RouteInfo[] = [
 
   // Products
   {
-    path: '/api/products',
+    path: '/api/v1/products',
     method: 'get',
     tags: ['Products'],
     summary: 'Get all products',
@@ -219,7 +219,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/my',
+    path: '/api/v1/products/my',
     method: 'get',
     tags: ['Products'],
     summary: 'Get seller products',
@@ -229,7 +229,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/:id',
+    path: '/api/v1/products/:id',
     method: 'get',
     tags: ['Products'],
     summary: 'Get product by ID',
@@ -242,7 +242,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/sku/:sku',
+    path: '/api/v1/products/sku/:sku',
     method: 'get',
     tags: ['Products'],
     summary: 'Get product by SKU',
@@ -255,7 +255,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/:id',
+    path: '/api/v1/products/:id',
     method: 'patch',
     tags: ['Products'],
     summary: 'Update a product',
@@ -268,7 +268,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/:id',
+    path: '/api/v1/products/:id',
     method: 'delete',
     tags: ['Products'],
     summary: 'Delete a product',
@@ -281,7 +281,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/:id/inventory',
+    path: '/api/v1/products/:id/inventory',
     method: 'patch',
     tags: ['Products'],
     summary: 'Update product inventory',
@@ -294,7 +294,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/products/:id/toggle-status',
+    path: '/api/v1/products/:id/toggle-status',
     method: 'patch',
     tags: ['Products'],
     summary: 'Toggle product status',
@@ -309,7 +309,7 @@ const routes: RouteInfo[] = [
 
   // Cart
   {
-    path: '/api/cart',
+    path: '/api/v1/cart',
     method: 'get',
     tags: ['Cart'],
     summary: 'Get user cart',
@@ -319,7 +319,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/cart/summary',
+    path: '/api/v1/cart/summary',
     method: 'get',
     tags: ['Cart'],
     summary: 'Get cart summary',
@@ -329,7 +329,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/cart',
+    path: '/api/v1/cart',
     method: 'post',
     tags: ['Cart'],
     summary: 'Add item to cart',
@@ -343,7 +343,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/cart/:productId',
+    path: '/api/v1/cart/:productId',
     method: 'patch',
     tags: ['Cart'],
     summary: 'Update cart item',
@@ -356,7 +356,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/cart/:productId',
+    path: '/api/v1/cart/:productId',
     method: 'delete',
     tags: ['Cart'],
     summary: 'Remove item from cart',
@@ -369,7 +369,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/cart/clear',
+    path: '/api/v1/cart/clear',
     method: 'delete',
     tags: ['Cart'],
     summary: 'Clear cart',
@@ -381,7 +381,7 @@ const routes: RouteInfo[] = [
 
   // Orders
   {
-    path: '/api/orders',
+    path: '/api/v1/orders',
     method: 'post',
     tags: ['Orders'],
     summary: 'Create an order',
@@ -404,7 +404,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders',
+    path: '/api/v1/orders',
     method: 'get',
     tags: ['Orders'],
     summary: 'Get user orders',
@@ -419,7 +419,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders/all',
+    path: '/api/v1/orders/all',
     method: 'get',
     tags: ['Orders'],
     summary: 'Get all orders (admin)',
@@ -436,7 +436,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders/:id',
+    path: '/api/v1/orders/:id',
     method: 'get',
     tags: ['Orders'],
     summary: 'Get order by ID',
@@ -450,7 +450,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders/:id/status',
+    path: '/api/v1/orders/:id/status',
     method: 'patch',
     tags: ['Orders'],
     summary: 'Update order status',
@@ -463,7 +463,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders/seller',
+    path: '/api/v1/orders/seller',
     method: 'get',
     tags: ['Orders'],
     summary: 'Get seller orders',
@@ -479,7 +479,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/orders/store/:storeId',
+    path: '/api/v1/orders/store/:storeId',
     method: 'get',
     tags: ['Orders'],
     summary: 'Get store orders',
@@ -494,7 +494,7 @@ const routes: RouteInfo[] = [
 
   // Reviews
   {
-    path: '/api/reviews/:productId',
+    path: '/api/v1/reviews/:productId',
     method: 'post',
     tags: ['Reviews'],
     summary: 'Create a review',
@@ -514,7 +514,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/:id',
+    path: '/api/v1/reviews/:id',
     method: 'patch',
     tags: ['Reviews'],
     summary: 'Update a review',
@@ -527,7 +527,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/:id',
+    path: '/api/v1/reviews/:id',
     method: 'delete',
     tags: ['Reviews'],
     summary: 'Delete a review',
@@ -540,7 +540,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/product/:productId',
+    path: '/api/v1/reviews/product/:productId',
     method: 'get',
     tags: ['Reviews'],
     summary: 'Get product reviews',
@@ -558,7 +558,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/product/:productId/stats',
+    path: '/api/v1/reviews/product/:productId/stats',
     method: 'get',
     tags: ['Reviews'],
     summary: 'Get product rating stats',
@@ -570,7 +570,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/my',
+    path: '/api/v1/reviews/my',
     method: 'get',
     tags: ['Reviews'],
     summary: 'Get user reviews',
@@ -580,7 +580,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/:id/helpful',
+    path: '/api/v1/reviews/:id/helpful',
     method: 'patch',
     tags: ['Reviews'],
     summary: 'Mark review as helpful',
@@ -593,7 +593,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/reviews/:productId/can-review',
+    path: '/api/v1/reviews/:productId/can-review',
     method: 'get',
     tags: ['Reviews'],
     summary: 'Check if user can review product',
@@ -608,7 +608,7 @@ const routes: RouteInfo[] = [
 
   // Categories
   {
-    path: '/api/categories',
+    path: '/api/v1/categories',
     method: 'get',
     tags: ['Categories'],
     summary: 'Get all categories',
@@ -617,7 +617,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/categories/:slug',
+    path: '/api/v1/categories/:slug',
     method: 'get',
     tags: ['Categories'],
     summary: 'Get category by slug',

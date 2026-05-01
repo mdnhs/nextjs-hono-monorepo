@@ -39,7 +39,7 @@ GET {{baseUrl}}/
 ###############################################
 
 ### Step 1: Login as SELLER (Copy token to @authToken)
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -48,7 +48,7 @@ Content-Type: {{contentType}}
 }
 
 ### Step 2: Login as BUYER (Copy token to @buyerToken)  
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -61,7 +61,7 @@ Content-Type: {{contentType}}
 ###############################################
 
 ### Register a new BUYER
-POST {{baseUrl}}/api/auth/register
+POST {{baseUrl}}/api/v1/auth/register
 Content-Type: {{contentType}}
 
 {
@@ -72,7 +72,7 @@ Content-Type: {{contentType}}
 }
 
 ### Register a new SELLER
-POST {{baseUrl}}/api/auth/register
+POST {{baseUrl}}/api/v1/auth/register
 Content-Type: {{contentType}}
 
 {
@@ -83,7 +83,7 @@ Content-Type: {{contentType}}
 }
 
 ### Register an ADMIN
-POST {{baseUrl}}/api/auth/register
+POST {{baseUrl}}/api/v1/auth/register
 Content-Type: {{contentType}}
 
 {
@@ -94,7 +94,7 @@ Content-Type: {{contentType}}
 }
 
 ### Login as BUYER
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -103,7 +103,7 @@ Content-Type: {{contentType}}
 }
 
 ### Login as SELLER (Copy the token from response and update @authToken above)
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -112,7 +112,7 @@ Content-Type: {{contentType}}
 }
 
 ### Login as ADMIN
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -121,7 +121,7 @@ Content-Type: {{contentType}}
 }
 
 ### Get Current User Profile (Requires authentication)
-GET {{baseUrl}}/api/auth/profile
+GET {{baseUrl}}/api/v1/auth/profile
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -129,27 +129,27 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Get All Published Stores (No auth required)
-GET {{baseUrl}}/api/stores
+GET {{baseUrl}}/api/v1/stores
 
 ### Get All Stores with Pagination
-GET {{baseUrl}}/api/stores?page=1&limit=5
+GET {{baseUrl}}/api/v1/stores?page=1&limit=5
 
 ### Get All Stores (Including DRAFT) - Admin view
-GET {{baseUrl}}/api/stores?status=DRAFT
+GET {{baseUrl}}/api/v1/stores?status=DRAFT
 Authorization: Bearer {{authToken}}
 
 ### Get Store by ID (Update storeId variable with actual ID)
-GET {{baseUrl}}/api/stores/{{storeId}}
+GET {{baseUrl}}/api/v1/stores/{{storeId}}
 
 ### Get Store by Slug
-GET {{baseUrl}}/api/stores/slug/{{storeSlug}}
+GET {{baseUrl}}/api/v1/stores/slug/{{storeSlug}}
 
 ###############################################
 ### STORE ENDPOINTS - SELLER OPERATIONS
 ###############################################
 
 ### Create a New Store (Requires SELLER or ADMIN role)
-POST {{baseUrl}}/api/stores
+POST {{baseUrl}}/api/v1/stores
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -161,7 +161,7 @@ Content-Type: {{contentType}}
 }
 
 ### Create Another Store
-POST {{baseUrl}}/api/stores
+POST {{baseUrl}}/api/v1/stores
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -173,15 +173,15 @@ Content-Type: {{contentType}}
 }
 
 ### Get My Stores (Seller's own stores)
-GET {{baseUrl}}/api/stores/my/stores
+GET {{baseUrl}}/api/v1/stores/my/stores
 Authorization: Bearer {{authToken}}
 
 ### Get My Stores with Pagination
-GET {{baseUrl}}/api/stores/my/stores?page=1&limit=10
+GET {{baseUrl}}/api/v1/stores/my/stores?page=1&limit=10
 Authorization: Bearer {{authToken}}
 
 ### Update Store (Update storeId with actual ID)
-PATCH {{baseUrl}}/api/stores/{{storeId}}
+PATCH {{baseUrl}}/api/v1/stores/{{storeId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -192,7 +192,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Store Slug
-PATCH {{baseUrl}}/api/stores/{{storeId}}
+PATCH {{baseUrl}}/api/v1/stores/{{storeId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -201,15 +201,15 @@ Content-Type: {{contentType}}
 }
 
 ### Publish Store (Make it visible to buyers)
-POST {{baseUrl}}/api/stores/{{storeId}}/publish
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/publish
 Authorization: Bearer {{authToken}}
 
 ### Unpublish Store (Hide from buyers)
-POST {{baseUrl}}/api/stores/{{storeId}}/unpublish
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/unpublish
 Authorization: Bearer {{authToken}}
 
 ### Delete Store (Permanent deletion)
-DELETE {{baseUrl}}/api/stores/{{storeId}}
+DELETE {{baseUrl}}/api/v1/stores/{{storeId}}
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -217,7 +217,7 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Test Invalid Login
-POST {{baseUrl}}/api/auth/login
+POST {{baseUrl}}/api/v1/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -226,7 +226,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Duplicate Email Registration
-POST {{baseUrl}}/api/auth/register
+POST {{baseUrl}}/api/v1/auth/register
 Content-Type: {{contentType}}
 
 {
@@ -237,7 +237,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Duplicate Store Slug
-POST {{baseUrl}}/api/stores
+POST {{baseUrl}}/api/v1/stores
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -249,7 +249,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Unauthorized Store Access (Try as BUYER)
-POST {{baseUrl}}/api/stores
+POST {{baseUrl}}/api/v1/stores
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -261,14 +261,14 @@ Content-Type: {{contentType}}
 }
 
 ### Test Missing Authentication
-GET {{baseUrl}}/api/auth/profile
+GET {{baseUrl}}/api/v1/auth/profile
 
 ### Test Invalid Token
-GET {{baseUrl}}/api/auth/profile
+GET {{baseUrl}}/api/v1/auth/profile
 Authorization: Bearer invalid-token-here
 
 ### Test Validation Error
-POST {{baseUrl}}/api/auth/register
+POST {{baseUrl}}/api/v1/auth/register
 Content-Type: {{contentType}}
 
 {
@@ -282,35 +282,35 @@ Content-Type: {{contentType}}
 ###############################################
 
 ### Get All Products (Active products from published stores)
-GET {{baseUrl}}/api/products
+GET {{baseUrl}}/api/v1/products
 
 ### Get All Products (Including inactive)
-GET {{baseUrl}}/api/products?isActive=false
+GET {{baseUrl}}/api/v1/products?isActive=false
 
 ### Search Products
-GET {{baseUrl}}/api/products?search=laptop
+GET {{baseUrl}}/api/v1/products?search=laptop
 
 ### Filter Products by Price Range
-GET {{baseUrl}}/api/products?minPrice=100&maxPrice=1000
+GET {{baseUrl}}/api/v1/products?minPrice=100&maxPrice=1000
 
 ### Filter Products by Category (Update categoryId)
-GET {{baseUrl}}/api/products?categoryId=category-id-here
+GET {{baseUrl}}/api/v1/products?categoryId=category-id-here
 
 ### Get Products for a Specific Store
-GET {{baseUrl}}/api/stores/{{storeId}}/products
+GET {{baseUrl}}/api/v1/stores/{{storeId}}/products
 
 ### Get Product by ID
-GET {{baseUrl}}/api/products/{{productId}}
+GET {{baseUrl}}/api/v1/products/{{productId}}
 
 ### Get Product by SKU
-GET {{baseUrl}}/api/products/sku/{{productSku}}
+GET {{baseUrl}}/api/v1/products/sku/{{productSku}}
 
 ###############################################
 ### PRODUCT ENDPOINTS - SELLER OPERATIONS
 ###############################################
 
 ### Create Product in Store (Requires SELLER auth)
-POST {{baseUrl}}/api/stores/{{storeId}}/products
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/products
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -328,7 +328,7 @@ Content-Type: {{contentType}}
 }
 
 ### Create Another Product
-POST {{baseUrl}}/api/stores/{{storeId}}/products
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/products
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -343,7 +343,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Product (Update productId)
-PATCH {{baseUrl}}/api/products/{{productId}}
+PATCH {{baseUrl}}/api/v1/products/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -354,7 +354,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Product Inventory
-PATCH {{baseUrl}}/api/products/{{productId}}/inventory
+PATCH {{baseUrl}}/api/v1/products/{{productId}}/inventory
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -363,11 +363,11 @@ Content-Type: {{contentType}}
 }
 
 ### Toggle Product Status (Activate/Deactivate)
-PATCH {{baseUrl}}/api/products/{{productId}}/toggle-status
+PATCH {{baseUrl}}/api/v1/products/{{productId}}/toggle-status
 Authorization: Bearer {{authToken}}
 
 ### Delete Product
-DELETE {{baseUrl}}/api/products/{{productId}}
+DELETE {{baseUrl}}/api/v1/products/{{productId}}
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -375,7 +375,7 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Test Duplicate SKU
-POST {{baseUrl}}/api/stores/{{storeId}}/products
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/products
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -388,7 +388,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Invalid Price
-POST {{baseUrl}}/api/stores/{{storeId}}/products
+POST {{baseUrl}}/api/v1/stores/{{storeId}}/products
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -401,7 +401,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Negative Inventory
-PATCH {{baseUrl}}/api/products/{{productId}}/inventory
+PATCH {{baseUrl}}/api/v1/products/{{productId}}/inventory
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -414,15 +414,15 @@ Content-Type: {{contentType}}
 ###############################################
 
 ### Get Cart (Creates one if doesn't exist)
-GET {{baseUrl}}/api/cart
+GET {{baseUrl}}/api/v1/cart
 Authorization: Bearer {{authToken}}
 
 ### Get Cart Summary (With store breakdown)
-GET {{baseUrl}}/api/cart/summary
+GET {{baseUrl}}/api/v1/cart/summary
 Authorization: Bearer {{authToken}}
 
 ### Add Product to Cart
-POST {{baseUrl}}/api/cart/items
+POST {{baseUrl}}/api/v1/cart/items
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -432,7 +432,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Cart Item Quantity
-PATCH {{baseUrl}}/api/cart/items/{{productId}}
+PATCH {{baseUrl}}/api/v1/cart/items/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -441,7 +441,7 @@ Content-Type: {{contentType}}
 }
 
 ### Remove Item from Cart (Set quantity to 0)
-PATCH {{baseUrl}}/api/cart/items/{{productId}}
+PATCH {{baseUrl}}/api/v1/cart/items/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -450,11 +450,11 @@ Content-Type: {{contentType}}
 }
 
 ### Remove Item from Cart (Direct delete)
-DELETE {{baseUrl}}/api/cart/items/{{productId}}
+DELETE {{baseUrl}}/api/v1/cart/items/{{productId}}
 Authorization: Bearer {{authToken}}
 
 ### Clear Cart
-DELETE {{baseUrl}}/api/cart/clear
+DELETE {{baseUrl}}/api/v1/cart/clear
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -462,7 +462,7 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Checkout (Create Order from Cart)
-POST {{baseUrl}}/api/orders/checkout
+POST {{baseUrl}}/api/v1/orders/checkout
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -478,24 +478,24 @@ Content-Type: {{contentType}}
 }
 
 ### Get My Orders
-GET {{baseUrl}}/api/orders
+GET {{baseUrl}}/api/v1/orders
 Authorization: Bearer {{authToken}}
 
 ### Get My Orders (Filtered by status)
-GET {{baseUrl}}/api/orders?status=PENDING
+GET {{baseUrl}}/api/v1/orders?status=PENDING
 Authorization: Bearer {{authToken}}
 
 ### Get Order by ID (Update with actual order ID)
 @orderId = 
-GET {{baseUrl}}/api/orders/{{orderId}}
+GET {{baseUrl}}/api/v1/orders/{{orderId}}
 Authorization: Bearer {{authToken}}
 
 ### Get Store Orders (As Seller)
-GET {{baseUrl}}/api/stores/{{storeId}}/orders
+GET {{baseUrl}}/api/v1/stores/{{storeId}}/orders
 Authorization: Bearer {{authToken}}
 
 ### Update Order Status (As Seller - Process Order)
-PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+PATCH {{baseUrl}}/api/v1/orders/{{orderId}}/status
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -504,7 +504,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Order Status (Ship Order)
-PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+PATCH {{baseUrl}}/api/v1/orders/{{orderId}}/status
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -513,7 +513,7 @@ Content-Type: {{contentType}}
 }
 
 ### Update Order Status (Deliver Order)
-PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+PATCH {{baseUrl}}/api/v1/orders/{{orderId}}/status
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -522,7 +522,7 @@ Content-Type: {{contentType}}
 }
 
 ### Cancel Order
-PATCH {{baseUrl}}/api/orders/{{orderId}}/status
+PATCH {{baseUrl}}/api/v1/orders/{{orderId}}/status
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -531,7 +531,7 @@ Content-Type: {{contentType}}
 }
 
 ### Get All Orders (Admin only)
-GET {{baseUrl}}/api/orders/all
+GET {{baseUrl}}/api/v1/orders/all
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -539,7 +539,7 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Test Adding Invalid Product to Cart
-POST {{baseUrl}}/api/cart/items
+POST {{baseUrl}}/api/v1/cart/items
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -549,7 +549,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Adding Out of Stock Product
-POST {{baseUrl}}/api/cart/items
+POST {{baseUrl}}/api/v1/cart/items
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -559,7 +559,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Checkout with Empty Cart
-POST {{baseUrl}}/api/orders/checkout
+POST {{baseUrl}}/api/v1/orders/checkout
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -579,20 +579,20 @@ Content-Type: {{contentType}}
 ###############################################
 
 ### Get Product Reviews (Public)
-GET {{baseUrl}}/api/reviews/product/{{productId}}
+GET {{baseUrl}}/api/v1/reviews/product/{{productId}}
 
 ### Get Product Reviews with Filters
-GET {{baseUrl}}/api/reviews/product/{{productId}}?rating=5&verified=true
+GET {{baseUrl}}/api/v1/reviews/product/{{productId}}?rating=5&verified=true
 
 ### Get Product Rating Statistics
-GET {{baseUrl}}/api/reviews/product/{{productId}}/stats
+GET {{baseUrl}}/api/v1/reviews/product/{{productId}}/stats
 
 ### Check if User Can Review Product
-GET {{baseUrl}}/api/reviews/product/{{productId}}/can-review
+GET {{baseUrl}}/api/v1/reviews/product/{{productId}}/can-review
 Authorization: Bearer {{authToken}}
 
 ### Create Product Review (After purchase)
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -604,7 +604,7 @@ Content-Type: {{contentType}}
 }
 
 ### Create Review with Order ID (Verified Purchase)
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -617,7 +617,7 @@ Content-Type: {{contentType}}
 
 ### Update Review (Update reviewId after creating a review)
 @reviewId = 
-PATCH {{baseUrl}}/api/reviews/{{reviewId}}
+PATCH {{baseUrl}}/api/v1/reviews/{{reviewId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -627,11 +627,11 @@ Content-Type: {{contentType}}
 }
 
 ### Delete Review
-DELETE {{baseUrl}}/api/reviews/{{reviewId}}
+DELETE {{baseUrl}}/api/v1/reviews/{{reviewId}}
 Authorization: Bearer {{authToken}}
 
 ### Mark Review as Helpful
-POST {{baseUrl}}/api/reviews/{{reviewId}}/helpful
+POST {{baseUrl}}/api/v1/reviews/{{reviewId}}/helpful
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -640,7 +640,7 @@ Content-Type: {{contentType}}
 }
 
 ### Mark Review as Not Helpful
-POST {{baseUrl}}/api/reviews/{{reviewId}}/helpful
+POST {{baseUrl}}/api/v1/reviews/{{reviewId}}/helpful
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -649,7 +649,7 @@ Content-Type: {{contentType}}
 }
 
 ### Get My Reviews
-GET {{baseUrl}}/api/reviews/my
+GET {{baseUrl}}/api/v1/reviews/my
 Authorization: Bearer {{authToken}}
 
 ###############################################
@@ -657,7 +657,7 @@ Authorization: Bearer {{authToken}}
 ###############################################
 
 ### Test Creating Review Without Purchase
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -667,7 +667,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Invalid Rating
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -677,7 +677,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Short Comment
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 
@@ -687,7 +687,7 @@ Content-Type: {{contentType}}
 }
 
 ### Test Duplicate Review
-POST {{baseUrl}}/api/reviews/product/{{productId}}
+POST {{baseUrl}}/api/v1/reviews/product/{{productId}}
 Authorization: Bearer {{authToken}}
 Content-Type: {{contentType}}
 

@@ -71,13 +71,13 @@ app.get("/", (c) => {
     version: "1.0.0",
     endpoints: {
       health: "/health",
-      auth: "/api/auth",
-      stores: "/api/stores",
-      products: "/api/products",
-      cart: "/api/cart",
-      orders: "/api/orders",
-      reviews: "/api/reviews",
-      categories: "/api/categories",
+      auth: "/api/v1/auth",
+      stores: "/api/v1/stores",
+      products: "/api/v1/products",
+      cart: "/api/v1/cart",
+      orders: "/api/v1/orders",
+      reviews: "/api/v1/reviews",
+      categories: "/api/v1/categories",
       swagger: "/swagger/ui",
       openapi: "/swagger/doc",
     },
@@ -88,13 +88,13 @@ app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.route("/api/auth", authRouter);
-app.route("/api/stores", storesRouter);
-app.route("/api/products", productsRouter);
-app.route("/api/cart", cartRouter);
-app.route("/api/orders", ordersRouter);
-app.route("/api/reviews", reviewsRouter);
-app.route("/api/categories", categoryRoutes);
+app.route("/api/v1/auth", authRouter);
+app.route("/api/v1/stores", storesRouter);
+app.route("/api/v1/products", productsRouter);
+app.route("/api/v1/cart", cartRouter);
+app.route("/api/v1/orders", ordersRouter);
+app.route("/api/v1/reviews", reviewsRouter);
+app.route("/api/v1/categories", categoryRoutes);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");
