@@ -1,16 +1,18 @@
 import { Hono } from 'hono'
 import { orderController } from '../controllers/order.controller'
-import { authenticate, authorize } from '../middlewares/auth'
+import { authenticate } from '../middlewares/auth'
+import { requirePermission, PERMISSIONS, requireOrderOwnership } from '../middlewares/rbac'
+import { enforceOrderLimit } from '../middlewares/limits'
 
 const ordersRouter = new Hono()
 
 ordersRouter.use('*', authenticate)
 
-ordersRouter.post('/checkout', (c) => orderController.createOrder(c))
-ordersRouter.get('/', (c) => orderController.getOrders(c))
-ordersRouter.get('/my', authorize('SELLER', 'ADMIN'), (c) => orderController.getSellerOrders(c))
-ordersRouter.get('/all', authorize('ADMIN'), (c) => orderController.getAllOrders(c))
-ordersRouter.get('/:id', (c) => orderController.getOrderById(c))
-ordersRouter.patch('/:id/status', authorize('SELLER', 'ADMIN'), (c) => orderController.updateOrderStatus(c))
+ordersRouter.post('/checkout', requirePermission(PERMISSIONS.BUYER_ORDERS), enforceOrderLimit, (c) => orderController.createOrder(c))
+ordersRouter.get('/', requirePermission(PERMISSIONS.BUYER_ORDERS), (c) => orderController.getOrders(c))
+ordersRouter.get('/my', requirePermission(PERMISSIONS.SELLER_ORDERS_MANAGE), (c) => orderController.getSellerOrders(c))
+ordersRouter.get('/all', requirePermission(PERMISSIONS.PLATFORM_ORDERS_READ), (c) => orderController.getAllOrders(c))
+ordersRouter.get('/:id', requireOrderOwnership, (c) => orderController.getOrderById(c))
+ordersRouter.patch('/:id/status', requirePermission(PERMISSIONS.SELLER_ORDERS_MANAGE), requireOrderOwnership, (c) => orderController.updateOrderStatus(c))
 
 export default ordersRouter

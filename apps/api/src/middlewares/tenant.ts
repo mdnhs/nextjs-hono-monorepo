@@ -25,11 +25,15 @@ export const resolveTenant = async (c: Context, next: Next) => {
   const hostname = parts[0]
   const hostParts = hostname.split('.')
 
-  if (hostParts.length > 2 && !hostname.includes('localhost')) {
+  if (hostname.endsWith('.localhost')) {
+    // store1.localhost:3000 → slug = store1
+    const subdomain = hostname.slice(0, hostname.length - '.localhost'.length)
+    if (subdomain) storeSlug = subdomain
+  } else if (hostParts.length > 2) {
     const appDomain = process.env.APP_DOMAIN || 'example.com'
     const expectedDomain = `.${appDomain}`
     if (hostname.endsWith(expectedDomain)) {
-      storeSlug = hostname.replace(expectedDomain, '')
+      storeSlug = hostname.slice(0, hostname.length - expectedDomain.length)
     }
   }
 

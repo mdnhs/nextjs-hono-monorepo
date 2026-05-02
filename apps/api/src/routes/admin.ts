@@ -1,27 +1,33 @@
 import { Hono } from 'hono'
 import { adminController } from '../controllers/admin.controller'
-import { authenticate, authorize } from '../middlewares/auth'
+import { authenticate } from '../middlewares/auth'
+import { requirePermission, PERMISSIONS } from '../middlewares/rbac'
 
 const adminRouter = new Hono()
 
-// All admin routes require admin role
-adminRouter.use('*', authenticate, authorize('ADMIN'))
+// All admin routes require authentication
+adminRouter.use('*', authenticate)
 
 // Dashboard
-adminRouter.get('/dashboard', (c) => adminController.getDashboard(c))
+adminRouter.get('/dashboard', requirePermission(PERMISSIONS.PLATFORM_DASHBOARD), (c) => adminController.getDashboard(c))
 
 // Store management
-adminRouter.get('/stores', (c) => adminController.getAllStores(c))
-adminRouter.get('/stores/pending', (c) => adminController.getPendingStores(c))
-adminRouter.post('/stores/:id/approve', (c) => adminController.approveStore(c))
-adminRouter.post('/stores/:id/reject', (c) => adminController.rejectStore(c))
-adminRouter.post('/stores/:id/suspend', (c) => adminController.suspendStore(c))
+adminRouter.get('/stores', requirePermission(PERMISSIONS.PLATFORM_STORES_READ), (c) => adminController.getAllStores(c))
+adminRouter.get('/stores/pending', requirePermission(PERMISSIONS.PLATFORM_STORES_READ), (c) => adminController.getPendingStores(c))
+adminRouter.post('/stores/:id/approve', requirePermission(PERMISSIONS.PLATFORM_STORES_MANAGE), (c) => adminController.approveStore(c))
+adminRouter.post('/stores/:id/reject', requirePermission(PERMISSIONS.PLATFORM_STORES_MANAGE), (c) => adminController.rejectStore(c))
+adminRouter.post('/stores/:id/suspend', requirePermission(PERMISSIONS.PLATFORM_STORES_MANAGE), (c) => adminController.suspendStore(c))
 
 // User management
-adminRouter.get('/users', (c) => adminController.getAllUsers(c))
-adminRouter.get('/users/:id', (c) => adminController.getUserDetails(c))
+adminRouter.get('/users', requirePermission(PERMISSIONS.PLATFORM_USERS_READ), (c) => adminController.getAllUsers(c))
+adminRouter.get('/users/:id', requirePermission(PERMISSIONS.PLATFORM_USERS_READ), (c) => adminController.getUserDetails(c))
 
 // Subscription management
-adminRouter.get('/subscriptions', (c) => adminController.getSubscriptions(c))
+adminRouter.get('/subscriptions', requirePermission(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_READ), (c) => adminController.getSubscriptions(c))
+adminRouter.post('/subscriptions/:id/cancel', requirePermission(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_MANAGE), (c) => adminController.cancelSubscription(c))
+adminRouter.patch('/subscriptions/:id', requirePermission(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_MANAGE), (c) => adminController.updateSubscription(c))
+
+// Order management (platform-wide)
+adminRouter.get('/orders', requirePermission(PERMISSIONS.PLATFORM_ORDERS_READ), (c) => adminController.getAllOrders(c))
 
 export default adminRouter

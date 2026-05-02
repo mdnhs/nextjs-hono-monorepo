@@ -214,6 +214,75 @@ export class AdminController extends BaseController {
       return this.handleError(error)
     }
   }
+
+  async cancelSubscription(c: Context) {
+    try {
+      const id = c.req.param('id')!
+      const sub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, id),
+      })
+
+      if (!sub) {
+        return c.json({ error: 'Subscription not found' }, 404)
+      }
+
+      const updated = await subscriptionService.cancelSubscription(sub.storeId)
+      return c.json({ message: 'Subscription cancelled', subscription: updated })
+    } catch (error: any) {
+      return this.handleError(error)
+    }
+  }
+
+  async updateSubscription(c: Context) {
+    try {
+      const id = c.req.param('id')!
+      const { planId } = await c.req.json()
+
+      const sub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, id),
+      })
+
+      if (!sub) {
+        return c.json({ error: 'Subscription not found' }, 404)
+      }
+
+      const updated = await subscriptionService.updateSubscriptionPlan(sub.storeId, planId)
+      return c.json({ message: 'Subscription updated', subscription: updated })
+    } catch (error: any) {
+      return this.handleError(error)
+    }
+  }
+
+  async getAllOrders(c: Context) {
+    try {
+      const { page, limit } = this.getPaginationParams(c)
+      const status = c.req.query('status') as any
+      const skip = (page - 1) * limit
+
+      const whereClause = status ? eq(orders.status, status) : undefined
+
+      const [rows, [{ total }]] = await Promise.all([
+        db.query.orders.findMany({
+          where: whereClause,
+          limit,
+          offset: skip,
+          orderBy: [desc(orders.createdAt)],
+          with: {
+            store: { columns: { id: true, name: true, slug: true } },
+            user: { columns: { id: true, name: true, email: true } },
+          },
+        }),
+        db.select({ total: sql<number>`count(*)::int` }).from(orders).where(whereClause),
+      ])
+
+      return c.json({
+        data: rows,
+        pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
+      })
+    } catch (error: any) {
+      return this.handleError(error)
+    }
+  }
 }
 
 export const adminController = new AdminController()

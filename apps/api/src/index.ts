@@ -17,6 +17,7 @@ import categoryRoutes from "./routes/category.routes";
 import planRouter from "./routes/plans";
 import adminRouter from "./routes/admin";
 import swaggerRouter from "./routes/swagger";
+import { resolveTenant } from "./middlewares/tenant";
 
 const app = new Hono();
 
@@ -49,6 +50,8 @@ app.use(
 );
 
 app.use("*", prettyJSON());
+
+app.use("/api/v1/*", resolveTenant);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

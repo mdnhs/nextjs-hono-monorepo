@@ -5,6 +5,9 @@ import productsRouter from './routes/products'
 import cartRouter from './routes/cart'
 import ordersRouter from './routes/orders'
 import reviewsRouter from './routes/reviews'
+import categoryRoutes from './routes/category.routes'
+import planRouter from './routes/plans'
+import adminRouter from './routes/admin'
 
 // Create API app for type export
 const api = new Hono()
@@ -15,6 +18,9 @@ const api = new Hono()
   .route('/cart', cartRouter)
   .route('/orders', ordersRouter)
   .route('/reviews', reviewsRouter)
+  .route('/categories', categoryRoutes)
+  .route('/plans', planRouter)
+  .route('/admin', adminRouter)
 
 export type ApiType = typeof api
 

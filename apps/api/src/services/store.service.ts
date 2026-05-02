@@ -206,6 +206,18 @@ export class StoreService extends BaseService {
     }
 
     if (data.customDomain) {
+      if (!data.planId) {
+        throw new Error('A plan with custom domain feature is required to set a custom domain')
+      }
+
+      const plan = await db.query.plans.findFirst({ where: eq(plans.id, data.planId) })
+      if (!plan) {
+        throw new Error('Plan not found')
+      }
+      if (!plan.customDomain) {
+        throw new Error(`Plan "${plan.name}" does not include custom domain feature. Upgrade to Pro or Enterprise.`)
+      }
+
       const existingDomain = await db.query.stores.findFirst({
         where: eq(stores.customDomain, data.customDomain),
       })
@@ -283,6 +295,17 @@ export class StoreService extends BaseService {
     }
 
     if (data.customDomain) {
+      const subscription = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.storeId, id),
+        with: { plan: true },
+      })
+      if (!subscription) {
+        throw new Error('A plan with custom domain feature is required to set a custom domain')
+      }
+      if (!subscription.plan.customDomain) {
+        throw new Error(`Plan "${subscription.plan.name}" does not include custom domain feature. Upgrade to Pro or Enterprise.`)
+      }
+
       const existing = await db.query.stores.findFirst({
         where: and(eq(stores.customDomain, data.customDomain), ne(stores.id, id)),
       })

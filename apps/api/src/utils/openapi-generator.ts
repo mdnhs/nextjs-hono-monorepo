@@ -135,27 +135,45 @@ const routes: RouteInfo[] = [
     method: 'post',
     tags: ['Stores'],
     summary: 'Create a store',
+    description: 'Create a new store. The slug becomes the subdomain: {slug}.{APP_DOMAIN}. Custom domain requires Pro or Enterprise plan.',
     requiresAuth: true,
     requestBody: {
-      name: { type: 'string' },
-      slug: { type: 'string' },
-      description: { type: 'string' },
+      name: { type: 'string', description: 'Store display name' },
+      slug: { type: 'string', description: 'Unique slug — used as subdomain: {slug}.yourdomain.com. Lowercase alphanumeric and hyphens only.' },
+      description: { type: 'string', description: 'Store description' },
+      logo: { type: 'string', description: 'Logo URL' },
+      planId: { type: 'string', description: 'Subscription plan ID. Required if setting customDomain.' },
+      customDomain: { type: 'string', description: 'Custom domain (e.g. mystore.com). Requires Pro or Enterprise plan. Set DNS CNAME to your APP_DOMAIN.' },
     },
     responses: {
-      '201': { description: 'Store created' },
+      '201': { description: 'Store created and pending admin approval' },
+      '400': { description: 'Validation error or plan does not support custom domain' },
+      '409': { description: 'Slug or custom domain already in use' },
     },
   },
   {
     path: '/api/v1/stores/:id',
-    method: 'put',
+    method: 'patch',
     tags: ['Stores'],
     summary: 'Update a store',
+    description: 'Update store details including domain. Set customDomain to null to remove it. Changing customDomain requires Pro or Enterprise plan.',
     requiresAuth: true,
     params: {
       id: { type: 'string', description: 'Store ID' },
     },
+    requestBody: {
+      name: { type: 'string', description: 'Store display name' },
+      description: { type: 'string', description: 'Store description' },
+      slug: { type: 'string', description: 'Store slug (also changes subdomain)' },
+      logo: { type: 'string', description: 'Logo URL' },
+      customDomain: { type: 'string', description: 'Custom domain (e.g. mystore.com). Set to null to remove. Requires Pro or Enterprise plan.' },
+    },
     responses: {
       '200': { description: 'Store updated' },
+      '400': { description: 'Validation error or plan does not support custom domain' },
+      '403': { description: 'Not authorized' },
+      '404': { description: 'Store not found' },
+      '409': { description: 'Slug or custom domain already in use' },
     },
   },
   {
@@ -171,33 +189,6 @@ const routes: RouteInfo[] = [
       '200': { description: 'Store deleted' },
     },
   },
-  {
-    path: '/api/v1/stores/:id/publish',
-    method: 'patch',
-    tags: ['Stores'],
-    summary: 'Publish a store',
-    requiresAuth: true,
-    params: {
-      id: { type: 'string', description: 'Store ID' },
-    },
-    responses: {
-      '200': { description: 'Store published' },
-    },
-  },
-  {
-    path: '/api/v1/stores/:id/unpublish',
-    method: 'patch',
-    tags: ['Stores'],
-    summary: 'Unpublish a store',
-    requiresAuth: true,
-    params: {
-      id: { type: 'string', description: 'Store ID' },
-    },
-    responses: {
-      '200': { description: 'Store unpublished' },
-    },
-  },
-
   // Products
   {
     path: '/api/v1/products',
@@ -252,6 +243,30 @@ const routes: RouteInfo[] = [
     responses: {
       '200': { description: 'Product details' },
       '404': { description: 'Product not found' },
+    },
+  },
+  {
+    path: '/api/v1/products',
+    method: 'post',
+    tags: ['Products'],
+    summary: 'Create a product',
+    description: 'Create a new product. Subject to plan limits.',
+    requiresAuth: true,
+    requestBody: {
+      name: { type: 'string', description: 'Product name' },
+      description: { type: 'string', description: 'Product description' },
+      price: { type: 'number', description: 'Product price' },
+      sku: { type: 'string', description: 'Product SKU' },
+      inventory: { type: 'integer', description: 'Initial inventory count' },
+      categoryId: { type: 'string', description: 'Category ID' },
+      storeId: { type: 'string', description: 'Store ID' },
+      images: { type: 'array', items: { type: 'string' }, description: 'Product images' },
+    },
+    responses: {
+      '201': { description: 'Product created successfully' },
+      '400': { description: 'Validation error' },
+      '402': { description: 'Product limit reached' },
+      '403': { description: 'Not authorized' },
     },
   },
   {
@@ -605,6 +620,32 @@ const routes: RouteInfo[] = [
       '200': { description: 'Review eligibility' },
     },
   },
+  {
+    path: '/api/v1/reviews/:id/helpful',
+    method: 'patch',
+    tags: ['Reviews'],
+    summary: 'Mark review as helpful',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Review ID' },
+    },
+    responses: {
+      '200': { description: 'Review marked as helpful' },
+    },
+  },
+  {
+    path: '/api/v1/reviews/:productId/can-review',
+    method: 'get',
+    tags: ['Reviews'],
+    summary: 'Check if user can review product',
+    requiresAuth: true,
+    params: {
+      productId: { type: 'string', description: 'Product ID' },
+    },
+    responses: {
+      '200': { description: 'Review eligibility' },
+    },
+  },
 
   // Categories
   {
@@ -842,6 +883,49 @@ const routes: RouteInfo[] = [
       '200': { description: 'List of subscriptions' },
     },
   },
+  {
+    path: '/api/v1/admin/orders',
+    method: 'get',
+    tags: ['Admin'],
+    summary: 'Get all orders (admin)',
+    requiresAuth: true,
+    query: {
+      status: { type: 'string', description: 'Filter by order status' },
+      storeId: { type: 'string', description: 'Filter by store' },
+      userId: { type: 'string', description: 'Filter by user' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of all orders' },
+    },
+  },
+  {
+    path: '/api/v1/admin/subscriptions/:id',
+    method: 'patch',
+    tags: ['Admin'],
+    summary: 'Update subscription (admin)',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Subscription ID' },
+    },
+    responses: {
+      '200': { description: 'Subscription updated' },
+    },
+  },
+  {
+    path: '/api/v1/admin/subscriptions/:id/cancel',
+    method: 'post',
+    tags: ['Admin'],
+    summary: 'Cancel subscription (admin)',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Subscription ID' },
+    },
+    responses: {
+      '200': { description: 'Subscription cancelled' },
+    },
+  },
 
   // Store Subscriptions
   {
@@ -898,6 +982,68 @@ const routes: RouteInfo[] = [
     },
     responses: {
       '200': { description: 'Plan limits and usage' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:storeId/products',
+    method: 'get',
+    tags: ['Stores'],
+    summary: 'Get store products',
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    query: {
+      categoryId: { type: 'string', description: 'Filter by category' },
+      isActive: { type: 'boolean', description: 'Filter by active status' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of store products' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:storeId/products',
+    method: 'post',
+    tags: ['Stores'],
+    summary: 'Create product in store',
+    description: 'Create a new product in the specified store. Subject to plan limits.',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      name: { type: 'string', description: 'Product name' },
+      description: { type: 'string', description: 'Product description' },
+      price: { type: 'number', description: 'Product price' },
+      sku: { type: 'string', description: 'Product SKU' },
+      inventory: { type: 'integer', description: 'Initial inventory count' },
+      categoryId: { type: 'string', description: 'Category ID' },
+      images: { type: 'array', items: { type: 'string' }, description: 'Product images' },
+    },
+    responses: {
+      '201': { description: 'Product created successfully' },
+      '400': { description: 'Validation error' },
+      '402': { description: 'Product limit reached' },
+      '403': { description: 'Not authorized' },
+    },
+  },
+  {
+    path: '/api/v1/stores/:storeId/orders',
+    method: 'get',
+    tags: ['Stores'],
+    summary: 'Get store orders',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    query: {
+      status: { type: 'string', description: 'Filter by order status' },
+      page: { type: 'integer', description: 'Page number' },
+      limit: { type: 'integer', description: 'Items per page' },
+    },
+    responses: {
+      '200': { description: 'List of store orders' },
     },
   },
 ]
