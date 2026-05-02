@@ -45,7 +45,7 @@ export class PlanController extends BaseController {
   async getAllPlans(c: Context) {
     try {
       const plans = await planService.getAllPlans()
-      return c.json(plans)
+      return this.success(c, plans)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -54,7 +54,7 @@ export class PlanController extends BaseController {
   async getActivePlans(c: Context) {
     try {
       const plans = await planService.getActivePlans()
-      return c.json(plans)
+      return this.success(c, plans)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -65,9 +65,13 @@ export class PlanController extends BaseController {
       const id = c.req.param('id')!
       const plan = await planService.getPlanById(id)
       if (!plan) {
-        return c.json({ error: 'Plan not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Plan not found'
+        }, 404)
       }
-      return c.json(plan)
+      return this.success(c, plan)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -77,7 +81,7 @@ export class PlanController extends BaseController {
     try {
       const validatedData = await this.parseBody<CreatePlanData>(c, createPlanSchema)
       const plan = await planService.createPlan(validatedData)
-      return c.json(plan, 201)
+      return this.success(c, plan, 'Plan created successfully', 201)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -88,7 +92,7 @@ export class PlanController extends BaseController {
       const id = c.req.param('id')!
       const validatedData = await this.parseBody<UpdatePlanData>(c, updatePlanSchema)
       const plan = await planService.updatePlan(id, validatedData)
-      return c.json(plan)
+      return this.success(c, plan, 'Plan updated successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -98,7 +102,7 @@ export class PlanController extends BaseController {
     try {
       const id = c.req.param('id')!
       await planService.deletePlan(id)
-      return c.json({ message: 'Plan deleted' })
+      return this.success(c, null, 'Plan deleted successfully')
     } catch (error: any) {
       return this.handleError(error)
     }

@@ -9,10 +9,7 @@ export class AuthController extends BaseController {
       const validatedData = await this.parseBody<RegisterData>(c, registerSchema)
       const result = await authService.register(validatedData)
       
-      return c.json({
-        message: 'User registered successfully',
-        ...result
-      }, 201)
+      return this.success(c, result, 'User registered successfully', 201)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -26,10 +23,7 @@ export class AuthController extends BaseController {
       // Set JWT token as httpOnly cookie for security
       c.header('Set-Cookie', `token=${result.token}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`)
       
-      return c.json({
-        message: 'Login successful',
-        ...result
-      })
+      return this.success(c, result, 'Login successful')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -40,7 +34,7 @@ export class AuthController extends BaseController {
       const user = c.get('user')
       const profile = await authService.getCurrentUser(user.userId)
       
-      return c.json(profile)
+      return this.success(c, profile)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -50,9 +44,7 @@ export class AuthController extends BaseController {
     // Clear the JWT cookie
     c.header('Set-Cookie', 'token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax')
     
-    return c.json({
-      message: 'Logout successful'
-    })
+    return this.success(c, null, 'Logout successful')
   }
 }
 

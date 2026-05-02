@@ -2,7 +2,46 @@ import { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { ZodError, z } from 'zod'
 
+export interface ApiResponse<T = any> {
+  data: T | null
+  pagination?: {
+    total: number
+    total_pages: number
+    current_page: number
+    limit: number
+    has_next_page: boolean
+    has_prev_page: boolean
+  }
+  error: boolean
+  message: string
+  causes?: any
+}
+
 export abstract class BaseController {
+  protected success<T>(c: Context, data: T, message = 'Success', status: number = 200) {
+    return c.json({
+      data,
+      error: false,
+      message
+    }, status as any)
+  }
+
+  protected paginate<T>(c: Context, result: { data: T[], pagination: any }, message = 'Success') {
+    return c.json({
+      data: result.data,
+      pagination: {
+        total: result.pagination.total,
+        total_pages: result.pagination.totalPages,
+        current_page: result.pagination.page,
+        limit: result.pagination.limit,
+        has_next_page: result.pagination.page < result.pagination.totalPages,
+        has_prev_page: result.pagination.page > 1
+      },
+      error: false,
+      message
+    }, 200)
+  }
+
   protected handleError(error: any): never {
     console.error('Controller Error:', error)
     

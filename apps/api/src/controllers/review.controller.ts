@@ -31,10 +31,7 @@ export class ReviewController extends BaseController {
       
       const review = await reviewService.createReview(productId, user.userId, validatedData)
       
-      return c.json({
-        message: 'Review created successfully',
-        review
-      }, 201)
+      return this.success(c, review, 'Review created successfully', 201)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -48,10 +45,7 @@ export class ReviewController extends BaseController {
       
       const review = await reviewService.updateReview(reviewId, user.userId, validatedData)
       
-      return c.json({
-        message: 'Review updated successfully',
-        review
-      })
+      return this.success(c, review, 'Review updated successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -64,7 +58,7 @@ export class ReviewController extends BaseController {
       
       const result = await reviewService.deleteReview(reviewId, user.userId)
       
-      return c.json(result)
+      return this.success(c, result, 'Review deleted successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -85,7 +79,7 @@ export class ReviewController extends BaseController {
       
       const result = await reviewService.getProductReviews(productId, filters, { page, limit })
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -97,7 +91,7 @@ export class ReviewController extends BaseController {
       
       const stats = await reviewService.getProductRatingStats(productId)
       
-      return c.json(stats)
+      return this.success(c, stats)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -110,7 +104,7 @@ export class ReviewController extends BaseController {
       
       const result = await reviewService.getUserReviews(user.userId, { page, limit })
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -124,7 +118,7 @@ export class ReviewController extends BaseController {
       
       const result = await reviewService.markReviewHelpful(reviewId, user.userId, helpful)
       
-      return c.json(result)
+      return this.success(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -137,7 +131,7 @@ export class ReviewController extends BaseController {
       
       const result = await reviewService.canUserReviewProduct(user.userId, productId)
       
-      return c.json(result)
+      return this.success(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }

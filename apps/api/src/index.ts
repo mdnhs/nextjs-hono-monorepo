@@ -109,10 +109,19 @@ app.use("/api/v1/*", async (c, next) => {
 app.use("/api/v1/*", resolveTenant);
 
 app.onError((err, c) => {
-  if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status);
-  }
-  return c.json({ error: "Internal Server Error" }, 500);
+  const status = err instanceof HTTPException ? err.status : 500;
+  const message = err.message || "Internal Server Error";
+  const causes = err instanceof HTTPException ? err.cause : undefined;
+
+  return c.json(
+    {
+      data: null,
+      error: true,
+      message,
+      ...(causes && { causes }),
+    },
+    status as any
+  );
 });
 
 app.get("/", (c) => {

@@ -250,6 +250,7 @@ export const get = async <T>(
   let requestUrl = url;
   if (params) {
     const queryString = Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null)
       .map(([key, value]) =>
         Array.isArray(value)
           ? value.map((item) => `${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`).join('&')

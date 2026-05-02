@@ -37,7 +37,7 @@ export class AdminController extends BaseController {
           .where(ne(orders.status, 'CANCELLED')),
       ])
 
-      return c.json({
+      return this.success(c, {
         stores: {
           total: Number(totalStores),
           pending: Number(pendingStores),
@@ -59,10 +59,11 @@ export class AdminController extends BaseController {
   async getAllStores(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const status = c.req.query('status') as any
+      const statusRaw = c.req.query('status')
+      const status = statusRaw ? (statusRaw.toUpperCase() as any) : undefined
 
       const result = await storeService.getAllStores({ status }, { page, limit })
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -72,7 +73,7 @@ export class AdminController extends BaseController {
     try {
       const { page, limit } = this.getPaginationParams(c)
       const result = await storeService.getAllStores({ status: 'PENDING' }, { page, limit })
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -93,7 +94,7 @@ export class AdminController extends BaseController {
         }
       }
 
-      return c.json({ message: 'Store approved successfully', store })
+      return this.success(c, store, 'Store approved successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -106,7 +107,7 @@ export class AdminController extends BaseController {
 
       const store = await storeService.rejectStore(storeId, user.userId)
 
-      return c.json({ message: 'Store rejected', store })
+      return this.success(c, store, 'Store rejected')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -119,7 +120,7 @@ export class AdminController extends BaseController {
 
       const store = await storeService.suspendStore(storeId, user.userId)
 
-      return c.json({ message: 'Store suspended', store })
+      return this.success(c, store, 'Store suspended')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -128,7 +129,8 @@ export class AdminController extends BaseController {
   async getAllUsers(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const role = c.req.query('role') as any
+      const roleRaw = c.req.query('role')
+      const role = roleRaw ? (roleRaw.toUpperCase() as any) : undefined
       const skip = (page - 1) * limit
 
       const whereClause = role ? eq(users.role, role) : undefined
@@ -151,7 +153,7 @@ export class AdminController extends BaseController {
         stores: undefined,
       }))
 
-      return c.json({
+      return this.paginate(c, {
         data: usersWithCount,
         pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
       })
@@ -175,10 +177,14 @@ export class AdminController extends BaseController {
       })
 
       if (!user) {
-        return c.json({ error: 'User not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'User not found'
+        }, 404)
       }
 
-      return c.json(user)
+      return this.success(c, user)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -187,7 +193,8 @@ export class AdminController extends BaseController {
   async getSubscriptions(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const status = c.req.query('status') as any
+      const statusRaw = c.req.query('status')
+      const status = statusRaw ? (statusRaw.toUpperCase() as any) : undefined
       const skip = (page - 1) * limit
 
       const whereClause = status ? eq(subscriptions.status, status) : undefined
@@ -206,7 +213,7 @@ export class AdminController extends BaseController {
         db.select({ total: sql<number>`count(*)::int` }).from(subscriptions).where(whereClause),
       ])
 
-      return c.json({
+      return this.paginate(c, {
         data: rows,
         pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
       })
@@ -223,11 +230,15 @@ export class AdminController extends BaseController {
       })
 
       if (!sub) {
-        return c.json({ error: 'Subscription not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Subscription not found'
+        }, 404)
       }
 
       const updated = await subscriptionService.cancelSubscription(sub.storeId)
-      return c.json({ message: 'Subscription cancelled', subscription: updated })
+      return this.success(c, updated, 'Subscription cancelled')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -243,11 +254,15 @@ export class AdminController extends BaseController {
       })
 
       if (!sub) {
-        return c.json({ error: 'Subscription not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Subscription not found'
+        }, 404)
       }
 
       const updated = await subscriptionService.updateSubscriptionPlan(sub.storeId, planId)
-      return c.json({ message: 'Subscription updated', subscription: updated })
+      return this.success(c, updated, 'Subscription updated')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -256,7 +271,8 @@ export class AdminController extends BaseController {
   async getAllOrders(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const status = c.req.query('status') as any
+      const statusRaw = c.req.query('status')
+      const status = statusRaw ? (statusRaw.toUpperCase() as any) : undefined
       const skip = (page - 1) * limit
 
       const whereClause = status ? eq(orders.status, status) : undefined
@@ -275,7 +291,7 @@ export class AdminController extends BaseController {
         db.select({ total: sql<number>`count(*)::int` }).from(orders).where(whereClause),
       ])
 
-      return c.json({
+      return this.paginate(c, {
         data: rows,
         pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
       })

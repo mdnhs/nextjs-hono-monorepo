@@ -26,9 +26,8 @@ export const authService = {
       };
     }
 
-    // Backend returns { message, user, token } directly (not wrapped in data)
-    const raw = response.data as unknown as LoginApiResponse;
-    return { error: false, message: raw.message, data: raw };
+    const raw = response.data?.data as LoginApiResponse;
+    return { error: false, message: response.data?.message ?? 'Login successful', data: raw };
   },
 
   async register(payload: RegisterPayload): Promise<AuthServiceResponse<LoginApiResponse>> {
@@ -42,8 +41,8 @@ export const authService = {
       };
     }
 
-    const raw = response.data as unknown as LoginApiResponse;
-    return { error: false, message: raw.message, data: raw };
+    const raw = response.data?.data as LoginApiResponse;
+    return { error: false, message: response.data?.message ?? 'Registered successfully', data: raw };
   },
 
   async getProfile(): Promise<AuthServiceResponse<AuthUser>> {
@@ -57,7 +56,7 @@ export const authService = {
       };
     }
 
-    const raw = response.data as unknown as AuthUser;
+    const raw = response.data?.data as AuthUser;
     return { error: false, message: 'OK', data: raw };
   },
 

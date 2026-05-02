@@ -28,7 +28,7 @@ export class StoreController extends BaseController {
         { page, limit }
       )
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -41,10 +41,14 @@ export class StoreController extends BaseController {
       const store = await storeService.getStoreById(id)
       
       if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
-        return c.json({ error: 'Store not found or not approved' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Store not found or not approved'
+        }, 404)
       }
       
-      return c.json(store)
+      return this.success(c, store)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -55,7 +59,7 @@ export class StoreController extends BaseController {
       const slug = c.req.param('slug')!
       const store = await storeService.getStoreBySlug(slug)
       
-      return c.json(store)
+      return this.success(c, store)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -71,7 +75,7 @@ export class StoreController extends BaseController {
         { page, limit }
       )
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -89,10 +93,7 @@ export class StoreController extends BaseController {
         customDomain: body.customDomain,
       }, user.userId)
       
-      return c.json({
-        message: 'Store created and pending approval',
-        store,
-      }, 201)
+      return this.success(c, store, 'Store created and pending approval', 201)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -111,7 +112,7 @@ export class StoreController extends BaseController {
         user.role
       )
       
-      return c.json(store)
+      return this.success(c, store, 'Store updated successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -128,7 +129,7 @@ export class StoreController extends BaseController {
         user.role
       )
       
-      return c.json(result)
+      return this.success(c, result, 'Store deleted successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -141,16 +142,24 @@ export class StoreController extends BaseController {
       
       const store = await storeService.getStoreById(storeId)
       if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
-        return c.json({ error: 'Not authorized' }, 403)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Not authorized'
+        }, 403)
       }
       
       const subscription = await subscriptionService.getSubscriptionByStoreId(storeId)
       
       if (!subscription) {
-        return c.json({ error: 'No subscription found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'No subscription found'
+        }, 404)
       }
       
-      return c.json(subscription)
+      return this.success(c, subscription)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -163,15 +172,16 @@ export class StoreController extends BaseController {
       
       const store = await storeService.getStoreById(storeId)
       if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
-        return c.json({ error: 'Not authorized' }, 403)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Not authorized'
+        }, 403)
       }
       
       const subscription = await subscriptionService.cancelSubscription(storeId)
       
-      return c.json({
-        message: 'Subscription cancelled',
-        subscription,
-      })
+      return this.success(c, subscription, 'Subscription cancelled')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -185,15 +195,16 @@ export class StoreController extends BaseController {
       
       const store = await storeService.getStoreById(storeId)
       if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
-        return c.json({ error: 'Not authorized' }, 403)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Not authorized'
+        }, 403)
       }
       
       const subscription = await subscriptionService.updateSubscriptionPlan(storeId, planId)
       
-      return c.json({
-        message: 'Subscription upgraded',
-        subscription,
-      })
+      return this.success(c, subscription, 'Subscription upgraded')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -206,7 +217,11 @@ export class StoreController extends BaseController {
       
       const store = await storeService.getStoreById(storeId)
       if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
-        return c.json({ error: 'Not authorized' }, 403)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Not authorized'
+        }, 403)
       }
       
       const [productLimit, orderLimit] = await Promise.all([
@@ -214,7 +229,7 @@ export class StoreController extends BaseController {
         subscriptionService.checkPlanLimits(storeId, 'orders'),
       ])
       
-      return c.json({
+      return this.success(c, {
         products: productLimit,
         orders: orderLimit,
       })

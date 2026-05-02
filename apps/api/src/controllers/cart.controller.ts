@@ -22,7 +22,7 @@ export class CartController extends BaseController {
       const user = c.get("user");
       const cart = await cartService.getOrCreateCart(user.userId);
 
-      return c.json(cart);
+      return this.success(c, cart);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -33,7 +33,7 @@ export class CartController extends BaseController {
       const user = c.get("user");
       const summary = await cartService.getCartSummary(user.userId);
 
-      return c.json(summary);
+      return this.success(c, summary);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -49,10 +49,7 @@ export class CartController extends BaseController {
 
       const cart = await cartService.addToCart(user.userId, validatedData);
 
-      return c.json({
-        message: "Product added to cart",
-        cart,
-      });
+      return this.success(c, cart, "Product added to cart");
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -73,13 +70,9 @@ export class CartController extends BaseController {
         validatedData
       );
 
-      return c.json({
-        message:
-          validatedData.quantity === 0
+      return this.success(c, cart, validatedData.quantity === 0
             ? "Item removed from cart"
-            : "Cart updated",
-        cart,
-      });
+            : "Cart updated");
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -92,10 +85,7 @@ export class CartController extends BaseController {
 
       const cart = await cartService.removeFromCart(user.userId, productId);
 
-      return c.json({
-        message: "Item removed from cart",
-        cart,
-      });
+      return this.success(c, cart, "Item removed from cart");
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -107,10 +97,7 @@ export class CartController extends BaseController {
 
       const cart = await cartService.clearCart(user.userId);
 
-      return c.json({
-        message: "Cart cleared",
-        cart,
-      });
+      return this.success(c, cart, "Cart cleared");
     } catch (error: any) {
       return this.handleError(error);
     }

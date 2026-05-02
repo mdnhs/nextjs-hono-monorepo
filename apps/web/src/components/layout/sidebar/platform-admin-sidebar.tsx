@@ -12,7 +12,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar"
-import { IconUsers, IconBuildingStore, IconCreditCard, IconReceipt, IconSettings, IconLayoutDashboard, IconShield, IconStar } from "@tabler/icons-react"
+import { IconUsers, IconBuildingStore, IconCreditCard, IconReceipt, IconSettings, IconLayoutDashboard, IconShield, IconStar, IconShoppingCart } from "@tabler/icons-react"
 
 const teams = [
   {
@@ -63,6 +63,17 @@ const navItems = [
       { title: "All Plans", url: "/admin/plans" },
       { title: "Create Plan", url: "/admin/plans/create" },
       { title: "Features", url: "/admin/plans/features" },
+    ],
+  },
+  {
+    title: "Orders",
+    url: "/admin/orders",
+    icon: <IconShoppingCart />,
+    items: [
+      { title: "All Orders", url: "/admin/orders" },
+      { title: "Pending", url: "/admin/orders?status=pending" },
+      { title: "Delivered", url: "/admin/orders?status=delivered" },
+      { title: "Cancelled", url: "/admin/orders?status=cancelled" },
     ],
   },
   {

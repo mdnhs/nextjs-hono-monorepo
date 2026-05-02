@@ -6,7 +6,7 @@ export class CategoryController extends BaseController {
   async getAllCategories(c: Context) {
     try {
       const categories = await categoryService.getAllCategories()
-      return c.json(categories)
+      return this.success(c, categories)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -16,7 +16,7 @@ export class CategoryController extends BaseController {
     try {
       const slug = c.req.param('slug')!
       const category = await categoryService.getCategoryBySlug(slug)
-      return c.json(category)
+      return this.success(c, category)
     } catch (error: any) {
       return this.handleError(error)
     }

@@ -30,13 +30,7 @@ export class OrderController extends BaseController {
 
       const orders = await orderService.createOrder(user.userId, validatedData);
 
-      return c.json(
-        {
-          message: "Order(s) created successfully",
-          orders,
-        },
-        201
-      );
+      return this.success(c, orders, 'Order(s) created successfully', 201);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -55,7 +49,7 @@ export class OrderController extends BaseController {
 
       const result = await orderService.getOrders(filters, { page, limit });
 
-      return c.json(result);
+      return this.paginate(c, result);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -76,7 +70,7 @@ export class OrderController extends BaseController {
 
       const result = await orderService.getOrders(filters, { page, limit });
 
-      return c.json(result);
+      return this.paginate(c, result);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -89,7 +83,7 @@ export class OrderController extends BaseController {
 
       const order = await orderService.getOrderById(orderId, user.userId);
 
-      return c.json(order);
+      return this.success(c, order);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -110,10 +104,7 @@ export class OrderController extends BaseController {
         user.userId
       );
 
-      return c.json({
-        message: `Order status updated to ${status}`,
-        order,
-      });
+      return this.success(c, order, `Order status updated to ${status}`);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -137,7 +128,7 @@ export class OrderController extends BaseController {
         { page, limit }
       );
 
-      return c.json(result);
+      return this.paginate(c, result);
     } catch (error: any) {
       return this.handleError(error);
     }
@@ -154,7 +145,7 @@ export class OrderController extends BaseController {
         limit,
       });
 
-      return c.json(result);
+      return this.paginate(c, result);
     } catch (error: any) {
       return this.handleError(error);
     }

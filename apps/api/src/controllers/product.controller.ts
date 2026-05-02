@@ -36,7 +36,7 @@ export class ProductController extends BaseController {
       
       const result = await productService.getAllProducts(filters, { page, limit })
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -50,10 +50,14 @@ export class ProductController extends BaseController {
       
       // If store is not approved, only ADMIN or store OWNER can view its products
       if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
-        return c.json({ error: 'Product not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Product not found'
+        }, 404)
       }
       
-      return c.json(product)
+      return this.success(c, product)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -67,10 +71,14 @@ export class ProductController extends BaseController {
       
       // If store is not approved, only ADMIN or store OWNER can view its products
       if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
-        return c.json({ error: 'Product not found' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Product not found'
+        }, 404)
       }
       
-      return c.json(product)
+      return this.success(c, product)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -85,13 +93,17 @@ export class ProductController extends BaseController {
 
       // If store is not approved, only ADMIN or store OWNER can view its products
       if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
-        return c.json({ error: 'Store not found or not approved' }, 404)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Store not found or not approved'
+        }, 404)
       }
 
       const { page, limit } = this.getPaginationParams(c)
       const result = await productService.getStoreProducts(storeId, { page, limit })
 
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -105,7 +117,11 @@ export class ProductController extends BaseController {
       const storeId = c.req.param('storeId') ?? body.storeId
       
       if (!storeId) {
-        return c.json({ error: 'Store ID is required' }, 400)
+        return c.json({
+          data: null,
+          error: true,
+          message: 'Store ID is required'
+        }, 400)
       }
       
       const validatedData = createProductSchema.parse(body)
@@ -117,7 +133,7 @@ export class ProductController extends BaseController {
         user.role
       )
       
-      return c.json(product, 201)
+      return this.success(c, product, 'Product created successfully', 201)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -136,7 +152,7 @@ export class ProductController extends BaseController {
         user.role
       )
       
-      return c.json(product)
+      return this.success(c, product, 'Product updated successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -153,7 +169,7 @@ export class ProductController extends BaseController {
         user.role
       )
       
-      return c.json(result)
+      return this.success(c, result, 'Product deleted successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -172,10 +188,7 @@ export class ProductController extends BaseController {
         user.role
       )
       
-      return c.json({
-        message: 'Inventory updated successfully',
-        product
-      })
+      return this.success(c, product, 'Inventory updated successfully')
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -192,10 +205,7 @@ export class ProductController extends BaseController {
         user.role
       )
       
-      return c.json({
-        message: `Product ${product.isActive ? 'activated' : 'deactivated'} successfully`,
-        product
-      })
+      return this.success(c, product, `Product ${product.isActive ? 'activated' : 'deactivated'} successfully`)
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -228,7 +238,7 @@ export class ProductController extends BaseController {
         { page, limit }
       )
       
-      return c.json(result)
+      return this.paginate(c, result)
     } catch (error: any) {
       return this.handleError(error)
     }
