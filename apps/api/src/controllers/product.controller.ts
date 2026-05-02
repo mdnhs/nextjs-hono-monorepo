@@ -1,6 +1,7 @@
 import { Context } from 'hono'
 import { BaseController } from './base.controller'
 import { productService, CreateProductData, UpdateProductData } from '../services/product.service'
+import { storeService } from '../services/store.service'
 import { createProductSchema } from '../utils/validation'
 import { z } from 'zod'
 
@@ -43,8 +44,14 @@ export class ProductController extends BaseController {
   
   async getProductById(c: Context) {
     try {
+      const user = c.get('user')
       const id = c.req.param('id')!
       const product = await productService.getProductById(id)
+      
+      // If store is not approved, only ADMIN or store OWNER can view its products
+      if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
+        return c.json({ error: 'Product not found' }, 404)
+      }
       
       return c.json(product)
     } catch (error: any) {
@@ -54,8 +61,14 @@ export class ProductController extends BaseController {
   
   async getProductBySku(c: Context) {
     try {
+      const user = c.get('user')
       const sku = c.req.param('sku')!
       const product = await productService.getProductBySku(sku)
+      
+      // If store is not approved, only ADMIN or store OWNER can view its products
+      if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
+        return c.json({ error: 'Product not found' }, 404)
+      }
       
       return c.json(product)
     } catch (error: any) {
@@ -65,22 +78,37 @@ export class ProductController extends BaseController {
   
   async getStoreProducts(c: Context) {
     try {
+      const user = c.get('user')
       const storeId = c.req.param('storeId')!
+
+      const store = await storeService.getStoreById(storeId)
+
+      // If store is not approved, only ADMIN or store OWNER can view its products
+      if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
+        return c.json({ error: 'Store not found or not approved' }, 404)
+      }
+
       const { page, limit } = this.getPaginationParams(c)
-      
       const result = await productService.getStoreProducts(storeId, { page, limit })
-      
+
       return c.json(result)
     } catch (error: any) {
       return this.handleError(error)
     }
   }
+
   
   async createProduct(c: Context) {
     try {
       const user = c.get('user')
-      const storeId = c.req.param('storeId')!
-      const validatedData = await this.parseBody<CreateProductData>(c, createProductSchema)
+      const body = await c.req.json()
+      const storeId = c.req.param('storeId') ?? body.storeId
+      
+      if (!storeId) {
+        return c.json({ error: 'Store ID is required' }, 400)
+      }
+      
+      const validatedData = createProductSchema.parse(body)
       
       const product = await productService.createProduct(
         storeId,

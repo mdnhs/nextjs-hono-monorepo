@@ -161,6 +161,8 @@ export class ProductService extends BaseService {
           id: stores.id,
           name: stores.name,
           slug: stores.slug,
+          status: stores.status,
+          ownerId: stores.ownerId,
         },
         category: {
           id: categories.id,
@@ -210,6 +212,8 @@ export class ProductService extends BaseService {
           id: stores.id,
           name: stores.name,
           slug: stores.slug,
+          status: stores.status,
+          ownerId: stores.ownerId,
         },
         category: {
           id: categories.id,

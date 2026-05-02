@@ -51,6 +51,61 @@ app.use(
 
 app.use("*", prettyJSON());
 
+const PUBLIC_ROUTES = [
+  { method: "GET", path: "/" },
+  { method: "GET", path: "/health" },
+  { method: "POST", path: "/api/v1/auth/login" },
+  { method: "POST", path: "/api/v1/auth/register" },
+  { method: "GET", path: "/api/v1/products" },
+  { method: "GET", path: "/api/v1/stores" },
+  { method: "GET", path: "/api/v1/categories" },
+  { method: "GET", path: "/api/v1/plans" },
+  { method: "GET", path: "/swagger/ui" },
+  { method: "GET", path: "/swagger/doc" },
+];
+
+const PUBLIC_PREFIXES = [
+  { method: "GET", path: "/api/v1/products/" },
+  { method: "GET", path: "/api/v1/stores/" },
+  { method: "GET", path: "/api/v1/categories/" },
+  { method: "GET", path: "/api/v1/reviews/product/" },
+  { method: "GET", path: "/api/v1/plans/" },
+];
+
+const PRIVATE_EXCEPTIONS = [
+  "/api/v1/products/my",
+  "/api/v1/stores/my",
+  "/api/v1/orders/my",
+  "/api/v1/reviews/my",
+];
+
+import { authenticate } from "./middlewares/auth";
+
+app.use("/api/v1/*", async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+
+  // Check exact matches
+  const isExactPublic = PUBLIC_ROUTES.some(
+    (r) => r.method === method && r.path === path
+  );
+  if (isExactPublic) return next();
+
+  // Check prefix matches for public storefront content
+  const isPrefixPublic = PUBLIC_PREFIXES.some(
+    (r) => r.method === method && path.startsWith(r.path)
+  );
+
+  // If it's a prefix match, ensure it's not a private exception (like /my)
+  if (isPrefixPublic) {
+    const isPrivateException = PRIVATE_EXCEPTIONS.some((p) => path === p);
+    if (!isPrivateException) return next();
+  }
+
+  // All other api/v1 routes require authentication
+  return authenticate(c, next);
+});
+
 app.use("/api/v1/*", resolveTenant);
 
 app.onError((err, c) => {

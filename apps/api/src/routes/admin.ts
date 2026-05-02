@@ -1,14 +1,22 @@
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { adminController } from '../controllers/admin.controller'
 import { authenticate } from '../middlewares/auth'
 import { requirePermission, PERMISSIONS } from '../middlewares/rbac'
 
 const adminRouter = new Hono()
 
-// All admin routes require authentication
-adminRouter.use('*', authenticate)
+// All admin routes require authentication and ADMIN role
+adminRouter.use(authenticate)
+adminRouter.use(async (c, next) => {
+  const user = c.get('user')
+  if (user?.role !== 'ADMIN') {
+    throw new HTTPException(403, { message: 'Admin access required' })
+  }
+  await next()
+})
 
-// Dashboard
+// Dashboard - requires high-level dashboard access
 adminRouter.get('/dashboard', requirePermission(PERMISSIONS.PLATFORM_DASHBOARD), (c) => adminController.getDashboard(c))
 
 // Store management

@@ -6,7 +6,7 @@ import { enforceOrderLimit } from '../middlewares/limits'
 
 const ordersRouter = new Hono()
 
-ordersRouter.use('*', authenticate)
+ordersRouter.use(authenticate)
 
 ordersRouter.post('/checkout', requirePermission(PERMISSIONS.BUYER_ORDERS), enforceOrderLimit, (c) => orderController.createOrder(c))
 ordersRouter.get('/', requirePermission(PERMISSIONS.BUYER_ORDERS), (c) => orderController.getOrders(c))

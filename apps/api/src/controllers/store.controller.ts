@@ -13,7 +13,14 @@ const upgradeSubscriptionSchema = z.object({
 export class StoreController extends BaseController {
   async getAllStores(c: Context) {
     try {
-      const status = c.req.query('status') as StoreStatus | undefined
+      const user = c.get('user')
+      const isAdmin = user?.role === 'ADMIN'
+      
+      // Public users (or non-admins) should only see APPROVED stores
+      const status = isAdmin 
+        ? (c.req.query('status') as StoreStatus | undefined)
+        : 'APPROVED' as const
+        
       const { page, limit } = this.getPaginationParams(c)
       
       const result = await storeService.getAllStores(
@@ -29,8 +36,13 @@ export class StoreController extends BaseController {
   
   async getStoreById(c: Context) {
     try {
+      const user = c.get('user')
       const id = c.req.param('id')!
       const store = await storeService.getStoreById(id)
+      
+      if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
+        return c.json({ error: 'Store not found or not approved' }, 404)
+      }
       
       return c.json(store)
     } catch (error: any) {

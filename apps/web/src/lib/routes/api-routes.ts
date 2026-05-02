@@ -5,4 +5,7 @@ export const API_ROUTES = {
     profile: '/auth/profile',
     register: '/auth/register',
   },
+  admin: {
+    dashboard: '/admin/dashboard',
+  },
 } as const;
