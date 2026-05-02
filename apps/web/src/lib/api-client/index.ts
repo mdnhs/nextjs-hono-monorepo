@@ -262,7 +262,7 @@ export const get = async <T>(
 };
 
 export const post = async <T>(url: string, data?: unknown, headers?: HeadersInit): Promise<ApiResponse<T>> =>
-  apiRequest<T>(url, { method: 'POST', headers, body: data ? JSON.stringify(data) : undefined });
+  apiRequest<T>(url, { method: 'POST', headers, body: data !== undefined ? JSON.stringify(data) : '' });
 
 export const put = async <T>(url: string, data?: unknown, headers?: HeadersInit): Promise<ApiResponse<T>> =>
   apiRequest<T>(url, { method: 'PUT', headers, body: data ? JSON.stringify(data) : undefined });

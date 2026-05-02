@@ -64,4 +64,16 @@ export const authService = {
   getRedirectPath(role: UserRole): string {
     return ROLE_REDIRECT[role] ?? APP_ROUTES.dashboard.index;
   },
+
+  async logout(): Promise<AuthServiceResponse<null>> {
+    const response = await authApi.logout();
+    if (response.error || response.status >= 400) {
+      return {
+        error: true,
+        message: response.data?.message ?? 'Logout failed',
+        data: null,
+      };
+    }
+    return { error: false, message: response.data?.message ?? 'Logged out', data: null };
+  },
 };
