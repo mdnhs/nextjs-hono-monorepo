@@ -1,12 +1,11 @@
 import { Hono } from 'hono'
 import { adminController } from '../controllers/admin.controller'
 import { authenticate, authorize } from '../middlewares/auth'
-import { UserRole } from '@prisma/client'
 
 const adminRouter = new Hono()
 
 // All admin routes require admin role
-adminRouter.use('*', authenticate, authorize(UserRole.ADMIN))
+adminRouter.use('*', authenticate, authorize('ADMIN'))
 
 // Dashboard
 adminRouter.get('/dashboard', (c) => adminController.getDashboard(c))

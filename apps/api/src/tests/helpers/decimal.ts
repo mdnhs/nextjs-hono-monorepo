@@ -1,12 +1,7 @@
-import { Decimal } from '@prisma/client/runtime/library'
-
-export const createDecimal = (value: string | number): Decimal => {
-  return new Decimal(value)
+export const createDecimal = (value: string | number) => {
+  return { toString: () => String(value), toNumber: () => Number(value), value: String(value) }
 }
 
 export const mockDecimal = (value: string | number) => {
-  const decimal = new Decimal(value)
-  return Object.assign(decimal, {
-    toJSON: () => value.toString(),
-  })
+  return { toString: () => String(value), toJSON: () => String(value), toNumber: () => Number(value) }
 }

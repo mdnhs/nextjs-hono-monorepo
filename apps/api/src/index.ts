@@ -1,10 +1,12 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import { HTTPException } from "hono/http-exception";
-import dotenv from "dotenv";
 import authRouter from "./routes/auth";
 import storesRouter from "./routes/stores";
 import productsRouter from "./routes/products";
@@ -15,8 +17,6 @@ import categoryRoutes from "./routes/category.routes";
 import planRouter from "./routes/plans";
 import adminRouter from "./routes/admin";
 import swaggerRouter from "./routes/swagger";
-
-dotenv.config();
 
 const app = new Hono();
 

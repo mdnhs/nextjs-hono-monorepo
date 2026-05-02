@@ -1,485 +1,420 @@
-import { Prisma, UserRole } from "@prisma/client";
-import { prisma } from "../utils/prisma";
-import { BaseService } from "./base.service";
+import { db } from '../db'
+import { products, stores, categories, reviews } from '../db/schema'
+import type { UserRole } from '../db/schema'
+import { eq, and, or, gte, lte, ilike, desc, count, avg, sql } from 'drizzle-orm'
+import { BaseService } from './base.service'
 
 export interface CreateProductData {
-  name: string;
-  description?: string;
-  price: number;
-  images?: string[];
-  sku: string;
-  quantity: number;
-  categoryId?: string;
-  isActive?: boolean;
+  name: string
+  description?: string
+  price: number
+  images?: string[]
+  sku: string
+  quantity: number
+  categoryId?: string
+  isActive?: boolean
 }
 
 export interface UpdateProductData {
-  name?: string;
-  description?: string;
-  price?: number;
-  images?: string[];
-  sku?: string;
-  quantity?: number;
-  categoryId?: string;
-  isActive?: boolean;
+  name?: string
+  description?: string
+  price?: number
+  images?: string[]
+  sku?: string
+  quantity?: number
+  categoryId?: string
+  isActive?: boolean
 }
 
 export interface ProductFilters {
-  storeId?: string;
-  categoryId?: string;
-  isActive?: boolean;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
-  includeUnpublishedStores?: boolean;
-  ownerId?: string; // Filter by store owner
+  storeId?: string
+  categoryId?: string
+  isActive?: boolean
+  minPrice?: number
+  maxPrice?: number
+  search?: string
+  includeUnpublishedStores?: boolean
+  ownerId?: string
 }
 
 export class ProductService extends BaseService {
-  async getAllProducts(
-    filters: ProductFilters,
-    pagination: { page: number; limit: number }
-  ) {
-    const { page, limit, skip } = this.getPaginationParams(pagination);
+  async getAllProducts(filters: ProductFilters, pagination: { page: number; limit: number }) {
+    const { page, limit, skip } = this.getPaginationParams(pagination)
 
-    const where: Prisma.ProductWhereInput = {
-      ...(filters.storeId && { storeId: filters.storeId }),
-      ...(filters.categoryId && { categoryId: filters.categoryId }),
-      ...(filters.isActive !== undefined && { isActive: filters.isActive }),
-      ...(filters.minPrice !== undefined && filters.maxPrice !== undefined && {
-        price: { gte: filters.minPrice, lte: filters.maxPrice },
-      }),
-      ...(filters.minPrice !== undefined && filters.maxPrice === undefined && {
-        price: { gte: filters.minPrice },
-      }),
-      ...(filters.maxPrice !== undefined && filters.minPrice === undefined && {
-        price: { lte: filters.maxPrice },
-      }),
-      ...(filters.search && {
-        OR: [
-          { name: { contains: filters.search, mode: "insensitive" } },
-          { description: { contains: filters.search, mode: "insensitive" } },
-          { sku: { contains: filters.search, mode: "insensitive" } },
-        ],
-      }),
-      ...(filters.ownerId && {
-        store: { 
-          ownerId: filters.ownerId,
-          ...(filters.includeUnpublishedStores ? {} : { status: 'APPROVED' })
-        }
-      }),
-      ...(!filters.ownerId && !filters.includeUnpublishedStores && {
-        store: { status: 'APPROVED' }
-      }),
-    };
+    const conditions: any[] = []
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
+    if (filters.storeId) conditions.push(eq(products.storeId, filters.storeId))
+    if (filters.categoryId) conditions.push(eq(products.categoryId, filters.categoryId))
+    if (filters.isActive !== undefined) conditions.push(eq(products.isActive, filters.isActive))
+    if (filters.minPrice !== undefined) conditions.push(gte(products.price, String(filters.minPrice)))
+    if (filters.maxPrice !== undefined) conditions.push(lte(products.price, String(filters.maxPrice)))
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(products.name, `%${filters.search}%`),
+          ilike(products.description, `%${filters.search}%`),
+          ilike(products.sku, `%${filters.search}%`)
+        )
+      )
+    }
+
+    // Store status filter via join
+    const storeConditions: any[] = []
+    if (filters.ownerId) {
+      storeConditions.push(eq(stores.ownerId, filters.ownerId))
+      if (!filters.includeUnpublishedStores) {
+        storeConditions.push(eq(stores.status, 'APPROVED'))
+      }
+    } else if (!filters.includeUnpublishedStores) {
+      storeConditions.push(eq(stores.status, 'APPROVED'))
+    }
+
+    const allConditions = [...conditions, ...storeConditions]
+    const whereClause = allConditions.length > 0 ? and(...allConditions) : undefined
+
+    const [rows, [{ total }]] = await Promise.all([
+      db
+        .select({
+          id: products.id,
+          name: products.name,
+          description: products.description,
+          price: products.price,
+          images: products.images,
+          sku: products.sku,
+          quantity: products.quantity,
+          isActive: products.isActive,
+          createdAt: products.createdAt,
+          updatedAt: products.updatedAt,
+          storeId: products.storeId,
+          categoryId: products.categoryId,
           store: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
+            id: stores.id,
+            name: stores.name,
+            slug: stores.slug,
           },
           category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
+            id: categories.id,
+            name: categories.name,
+            slug: categories.slug,
           },
-          _count: {
-            select: {
-              reviews: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
-    
-    const productsWithRatings = await Promise.all(
-      products.map(async (product) => {
-        const reviews = await prisma.review.aggregate({
-          where: { productId: product.id },
-          _avg: { rating: true },
-          _count: { rating: true }
         })
-        
-        return {
-          ...product,
-          rating: {
-            average: reviews._avg.rating || 0,
-            count: reviews._count.rating
-          }
-        }
-      })
-    );
+        .from(products)
+        .innerJoin(stores, eq(products.storeId, stores.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(whereClause)
+        .orderBy(desc(products.createdAt))
+        .limit(limit)
+        .offset(skip),
+      db
+        .select({ total: count() })
+        .from(products)
+        .innerJoin(stores, eq(products.storeId, stores.id))
+        .where(whereClause),
+    ])
 
-    return this.formatPaginatedResult(productsWithRatings, total, page, limit);
+    const productIds = rows.map((p) => p.id)
+    const ratingsMap = new Map<string, { average: number; count: number }>()
+
+    if (productIds.length > 0) {
+      const ratingRows = await db
+        .select({
+          productId: reviews.productId,
+          avgRating: avg(reviews.rating),
+          countRating: count(),
+        })
+        .from(reviews)
+        .where(sql`${reviews.productId} IN (${sql.join(productIds.map((id) => sql`${id}`), sql`, `)})`)
+        .groupBy(reviews.productId)
+
+      for (const r of ratingRows) {
+        ratingsMap.set(r.productId, {
+          average: r.avgRating ? Number(r.avgRating) : 0,
+          count: Number(r.countRating),
+        })
+      }
+    }
+
+    const data = rows.map((p) => ({
+      ...p,
+      rating: ratingsMap.get(p.id) ?? { average: 0, count: 0 },
+    }))
+
+    return this.formatPaginatedResult(data, Number(total), page, limit)
   }
 
   async getProductById(id: string) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
+    const [row] = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        images: products.images,
+        sku: products.sku,
+        quantity: products.quantity,
+        isActive: products.isActive,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        storeId: products.storeId,
+        categoryId: products.categoryId,
         store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            owner: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
+          id: stores.id,
+          name: stores.name,
+          slug: stores.slug,
         },
         category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+          id: categories.id,
+          name: categories.name,
+          slug: categories.slug,
         },
-        _count: {
-          select: {
-            reviews: true
-          }
-        }
-      },
-    });
+      })
+      .from(products)
+      .innerJoin(stores, eq(products.storeId, stores.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.id, id))
 
-    if (!product) {
-      throw new Error("Product not found");
+    if (!row) {
+      throw new Error('Product not found')
     }
-    
-    const reviews = await prisma.review.aggregate({
-      where: { productId: product.id },
-      _avg: { rating: true },
-      _count: { rating: true }
-    })
+
+    const [ratingRow] = await db
+      .select({ avgRating: avg(reviews.rating), countRating: count() })
+      .from(reviews)
+      .where(eq(reviews.productId, id))
 
     return {
-      ...product,
+      ...row,
       rating: {
-        average: reviews._avg.rating || 0,
-        count: reviews._count.rating
-      }
-    };
+        average: ratingRow?.avgRating ? Number(ratingRow.avgRating) : 0,
+        count: Number(ratingRow?.countRating ?? 0),
+      },
+    }
   }
 
   async getProductBySku(sku: string) {
-    const product = await prisma.product.findUnique({
-      where: { sku },
-      include: {
+    const [row] = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        images: products.images,
+        sku: products.sku,
+        quantity: products.quantity,
+        isActive: products.isActive,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        storeId: products.storeId,
+        categoryId: products.categoryId,
         store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+          id: stores.id,
+          name: stores.name,
+          slug: stores.slug,
         },
         category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+          id: categories.id,
+          name: categories.name,
+          slug: categories.slug,
         },
-      },
-    });
+      })
+      .from(products)
+      .innerJoin(stores, eq(products.storeId, stores.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.sku, sku))
 
-    if (!product) {
-      throw new Error("Product not found");
+    if (!row) {
+      throw new Error('Product not found')
     }
 
-    return product;
+    return row
   }
 
-  async getStoreProducts(
-    storeId: string,
-    pagination: { page: number; limit: number }
-  ) {
-    const { page, limit, skip } = this.getPaginationParams(pagination);
+  async getStoreProducts(storeId: string, pagination: { page: number; limit: number }) {
+    const { page, limit, skip } = this.getPaginationParams(pagination)
 
-    const where = { storeId, isActive: true };
+    const where = and(eq(products.storeId, storeId), eq(products.isActive, true))
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
+    const [rows, [{ total }]] = await Promise.all([
+      db
+        .select({
+          id: products.id,
+          name: products.name,
+          description: products.description,
+          price: products.price,
+          images: products.images,
+          sku: products.sku,
+          quantity: products.quantity,
+          isActive: products.isActive,
+          createdAt: products.createdAt,
+          updatedAt: products.updatedAt,
+          storeId: products.storeId,
+          categoryId: products.categoryId,
           category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
+            id: categories.id,
+            name: categories.name,
+            slug: categories.slug,
           },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+        })
+        .from(products)
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(where)
+        .orderBy(desc(products.createdAt))
+        .limit(limit)
+        .offset(skip),
+      db.select({ total: count() }).from(products).where(where),
+    ])
 
-    return this.formatPaginatedResult(products, total, page, limit);
+    return this.formatPaginatedResult(rows, Number(total), page, limit)
   }
 
-  async createProduct(
-    storeId: string,
-    data: CreateProductData,
-    userId: string,
-    userRole: UserRole
-  ) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-    });
+  async createProduct(storeId: string, data: CreateProductData, userId: string, userRole: UserRole) {
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, storeId) })
 
     if (!store) {
-      throw new Error("Store not found");
+      throw new Error('Store not found')
     }
 
-    if (store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error("Not authorized to add products to this store");
+    if (store.ownerId !== userId && userRole !== 'ADMIN') {
+      throw new Error('Not authorized to add products to this store')
     }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { sku: data.sku },
-    });
-
-    if (existingProduct) {
-      throw new Error("SKU already exists");
+    const existing = await db.query.products.findFirst({ where: eq(products.sku, data.sku) })
+    if (existing) {
+      throw new Error('SKU already exists')
     }
 
     if (data.categoryId) {
-      const category = await prisma.category.findUnique({
-        where: { id: data.categoryId },
-      });
-
-      if (!category) {
-        throw new Error("Category not found");
+      const cat = await db.query.categories.findFirst({ where: eq(categories.id, data.categoryId) })
+      if (!cat) {
+        throw new Error('Category not found')
       }
     }
 
-    const product = await prisma.product.create({
-      data: {
+    const [product] = await db
+      .insert(products)
+      .values({
         ...data,
+        price: String(data.price),
         storeId,
         images: data.images || [],
-      },
-      include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
+      })
+      .returning()
 
-    return product;
+    return this.getProductById(product.id)
   }
 
-  async updateProduct(
-    id: string,
-    data: UpdateProductData,
-    userId: string,
-    userRole: UserRole
-  ) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        store: true,
-      },
-    });
+  async updateProduct(id: string, data: UpdateProductData, userId: string, userRole: UserRole) {
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, id),
+      with: { store: true },
+    })
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error("Not authorized to update this product");
+    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+      throw new Error('Not authorized to update this product')
     }
 
     if (data.sku && data.sku !== product.sku) {
-      const existingProduct = await prisma.product.findUnique({
-        where: { sku: data.sku },
-      });
-
-      if (existingProduct) {
-        throw new Error("SKU already exists");
+      const existing = await db.query.products.findFirst({ where: eq(products.sku, data.sku) })
+      if (existing) {
+        throw new Error('SKU already exists')
       }
     }
 
     if (data.categoryId) {
-      const category = await prisma.category.findUnique({
-        where: { id: data.categoryId },
-      });
-
-      if (!category) {
-        throw new Error("Category not found");
+      const cat = await db.query.categories.findFirst({ where: eq(categories.id, data.categoryId) })
+      if (!cat) {
+        throw new Error('Category not found')
       }
     }
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data,
-      include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
+    const updateData: Record<string, unknown> = { ...data }
+    if (data.price !== undefined) updateData.price = String(data.price)
 
-    return updatedProduct;
+    await db.update(products).set(updateData as any).where(eq(products.id, id))
+
+    return this.getProductById(id)
   }
 
   async deleteProduct(id: string, userId: string, userRole: UserRole) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        store: true,
-      },
-    });
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, id),
+      with: { store: true },
+    })
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error("Not authorized to delete this product");
+    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+      throw new Error('Not authorized to delete this product')
     }
 
-    await prisma.product.delete({
-      where: { id },
-    });
+    await db.delete(products).where(eq(products.id, id))
 
-    return { message: "Product deleted successfully" };
+    return { message: 'Product deleted successfully' }
   }
 
-  async updateInventory(
-    id: string,
-    quantity: number,
-    userId: string,
-    userRole: UserRole
-  ) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        store: true,
-      },
-    });
+  async updateInventory(id: string, quantity: number, userId: string, userRole: UserRole) {
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, id),
+      with: { store: true },
+    })
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error("Not authorized to update inventory");
+    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+      throw new Error('Not authorized to update inventory')
     }
 
     if (quantity < 0) {
-      throw new Error("Quantity cannot be negative");
+      throw new Error('Quantity cannot be negative')
     }
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: { quantity },
-      include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
+    const [updated] = await db
+      .update(products)
+      .set({ quantity })
+      .where(eq(products.id, id))
+      .returning()
 
-    return updatedProduct;
+    return { ...updated, store: { id: product.store.id, name: product.store.name, slug: product.store.slug } }
   }
 
   async toggleProductStatus(id: string, userId: string, userRole: UserRole) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        store: true,
-      },
-    });
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, id),
+      with: { store: true },
+    })
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new Error("Not authorized to update product status");
+    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+      throw new Error('Not authorized to update product status')
     }
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: { isActive: !product.isActive },
-      include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
+    const [updated] = await db
+      .update(products)
+      .set({ isActive: !product.isActive })
+      .where(eq(products.id, id))
+      .returning()
 
-    return updatedProduct;
+    return { ...updated, store: { id: product.store.id, name: product.store.name, slug: product.store.slug } }
   }
 
-  // Get all products owned by a specific user (across all their stores)
   async getSellerProducts(
     ownerId: string,
     filters: Omit<ProductFilters, 'ownerId'> = {},
     pagination: { page: number; limit: number }
   ) {
-    return this.getAllProducts(
-      { 
-        ...filters, 
-        ownerId, 
-        includeUnpublishedStores: true // Sellers should see their own draft store products
-      },
-      pagination
-    );
+    return this.getAllProducts({ ...filters, ownerId, includeUnpublishedStores: true }, pagination)
   }
 }
 
-export const productService = new ProductService();
+export const productService = new ProductService()

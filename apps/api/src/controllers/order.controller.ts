@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { BaseController } from "./base.controller";
 import { orderService, CreateOrderData } from "../services/order.service";
-import { OrderStatus } from "@prisma/client";
+import type { OrderStatus } from "../db/schema";
 import { z } from "zod";
 
 const createOrderSchema = z.object({
@@ -16,7 +16,7 @@ const createOrderSchema = z.object({
 });
 
 const updateOrderStatusSchema = z.object({
-  status: z.nativeEnum(OrderStatus),
+  status: z.enum(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
 });
 
 export class OrderController extends BaseController {

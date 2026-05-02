@@ -1,9 +1,9 @@
 import { Context } from 'hono'
-import { StoreStatus } from '@prisma/client'
 import { BaseController } from './base.controller'
 import { storeService, CreateStoreData, UpdateStoreData } from '../services/store.service'
 import { subscriptionService } from '../services/subscription.service'
 import { createStoreSchema, updateStoreSchema } from '../utils/validation'
+import type { StoreStatus } from '../db/schema'
 import { z } from 'zod'
 
 const upgradeSubscriptionSchema = z.object({

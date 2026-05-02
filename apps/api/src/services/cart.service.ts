@@ -1,228 +1,164 @@
-import { prisma } from "../utils/prisma";
-import { BaseService } from "./base.service";
+import { db } from '../db'
+import { carts, cartItems, products } from '../db/schema'
+import { eq, and } from 'drizzle-orm'
+import { BaseService } from './base.service'
 
 export interface AddToCartData {
-  productId: string;
-  quantity: number;
+  productId: string
+  quantity: number
 }
 
 export interface UpdateCartItemData {
-  quantity: number;
+  quantity: number
 }
 
 export class CartService extends BaseService {
   async getOrCreateCart(userId: string) {
-    let cart = await prisma.cart.findUnique({
-      where: { userId },
-      include: {
+    let cart = await db.query.carts.findFirst({
+      where: eq(carts.userId, userId),
+      with: {
         items: {
-          include: {
+          with: {
             product: {
-              include: {
-                store: {
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                  },
-                },
+              with: {
+                store: { columns: { id: true, name: true, slug: true } },
               },
             },
           },
         },
       },
-    });
+    })
 
     if (!cart) {
-      cart = await prisma.cart.create({
-        data: { userId },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  store: {
-                    select: {
-                      id: true,
-                      name: true,
-                      slug: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
+      const [newCart] = await db.insert(carts).values({ userId }).returning()
+      cart = { ...newCart, items: [] }
     }
 
-    return this.formatCartResponse(cart);
+    return this.formatCartResponse(cart)
   }
 
   async addToCart(userId: string, data: AddToCartData) {
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
-      include: { store: true },
-    });
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, data.productId),
+      with: { store: true },
+    })
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error('Product not found')
     }
 
     if (!product.isActive) {
-      throw new Error("Product is not available");
+      throw new Error('Product is not available')
     }
 
-    if (product.store.status !== "APPROVED") {
-      throw new Error("Store is not available");
+    if (product.store.status !== 'APPROVED') {
+      throw new Error('Store is not available')
     }
 
     if (product.quantity < data.quantity) {
-      throw new Error(`Only ${product.quantity} items available in stock`);
+      throw new Error(`Only ${product.quantity} items available in stock`)
     }
 
-    const cart = await this.getOrCreateCart(userId);
+    const cart = await this.getOrCreateCart(userId)
 
-    const existingItem = await prisma.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: cart.id,
-          productId: data.productId,
-        },
-      },
-    });
+    const existingItem = await db.query.cartItems.findFirst({
+      where: and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, data.productId)),
+    })
 
     if (existingItem) {
-      const newQuantity = existingItem.quantity + data.quantity;
+      const newQuantity = existingItem.quantity + data.quantity
 
       if (product.quantity < newQuantity) {
-        throw new Error(`Only ${product.quantity} items available in stock`);
+        throw new Error(`Only ${product.quantity} items available in stock`)
       }
 
-      await prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
+      await db
+        .update(cartItems)
+        .set({ quantity: newQuantity })
+        .where(eq(cartItems.id, existingItem.id))
     } else {
-      await prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId: data.productId,
-          quantity: data.quantity,
-        },
-      });
+      await db.insert(cartItems).values({
+        cartId: cart.id,
+        productId: data.productId,
+        quantity: data.quantity,
+      })
     }
 
-    return this.getOrCreateCart(userId);
+    return this.getOrCreateCart(userId)
   }
 
-  async updateCartItem(
-    userId: string,
-    productId: string,
-    data: UpdateCartItemData
-  ) {
-    const cart = await this.getOrCreateCart(userId);
+  async updateCartItem(userId: string, productId: string, data: UpdateCartItemData) {
+    const cart = await this.getOrCreateCart(userId)
 
-    const cartItem = await prisma.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: cart.id,
-          productId,
-        },
-      },
-      include: { product: true },
-    });
+    const cartItem = await db.query.cartItems.findFirst({
+      where: and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId)),
+      with: { product: true },
+    })
 
     if (!cartItem) {
-      throw new Error("Item not found in cart");
+      throw new Error('Item not found in cart')
     }
 
     if (data.quantity === 0) {
-      await prisma.cartItem.delete({
-        where: { id: cartItem.id },
-      });
+      await db.delete(cartItems).where(eq(cartItems.id, cartItem.id))
     } else {
       if (cartItem.product.quantity < data.quantity) {
-        throw new Error(
-          `Only ${cartItem.product.quantity} items available in stock`
-        );
+        throw new Error(`Only ${cartItem.product.quantity} items available in stock`)
       }
 
-      await prisma.cartItem.update({
-        where: { id: cartItem.id },
-        data: { quantity: data.quantity },
-      });
+      await db.update(cartItems).set({ quantity: data.quantity }).where(eq(cartItems.id, cartItem.id))
     }
 
-    return this.getOrCreateCart(userId);
+    return this.getOrCreateCart(userId)
   }
 
   async removeFromCart(userId: string, productId: string) {
-    const cart = await this.getOrCreateCart(userId);
+    const cart = await this.getOrCreateCart(userId)
 
-    const cartItem = await prisma.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: cart.id,
-          productId,
-        },
-      },
-    });
+    const cartItem = await db.query.cartItems.findFirst({
+      where: and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId)),
+    })
 
     if (!cartItem) {
-      throw new Error("Item not found in cart");
+      throw new Error('Item not found in cart')
     }
 
-    await prisma.cartItem.delete({
-      where: { id: cartItem.id },
-    });
+    await db.delete(cartItems).where(eq(cartItems.id, cartItem.id))
 
-    return this.getOrCreateCart(userId);
+    return this.getOrCreateCart(userId)
   }
 
   async clearCart(userId: string) {
-    const cart = await this.getOrCreateCart(userId);
+    const cart = await this.getOrCreateCart(userId)
 
-    await prisma.cartItem.deleteMany({
-      where: { cartId: cart.id },
-    });
+    await db.delete(cartItems).where(eq(cartItems.cartId, cart.id))
 
-    return this.getOrCreateCart(userId);
+    return this.getOrCreateCart(userId)
   }
 
   async getCartSummary(userId: string) {
-    const cart = await this.getOrCreateCart(userId);
+    const cart = await this.getOrCreateCart(userId)
 
     const summary = {
       itemCount: 0,
       uniqueItems: cart.items.length,
       subtotal: 0,
-      stores: new Map<
-        string,
-        { name: string; items: any[]; subtotal: number }
-      >(),
-    };
+      stores: new Map<string, { name: string; items: any[]; subtotal: number }>(),
+    }
 
     for (const item of cart.items) {
-      summary.itemCount += item.quantity;
-      const itemTotal = Number(item.product.price) * item.quantity;
-      summary.subtotal += itemTotal;
+      summary.itemCount += item.quantity
+      const itemTotal = Number(item.product.price) * item.quantity
+      summary.subtotal += itemTotal
 
-      const storeId = item.product.store.id;
+      const storeId = item.product.store.id
       if (!summary.stores.has(storeId)) {
-        summary.stores.set(storeId, {
-          name: item.product.store.name,
-          items: [],
-          subtotal: 0,
-        });
+        summary.stores.set(storeId, { name: item.product.store.name, items: [], subtotal: 0 })
       }
 
-      const store = summary.stores.get(storeId)!;
-      store.items.push({
-        ...item,
-        total: itemTotal,
-      });
-      store.subtotal += itemTotal;
+      const store = summary.stores.get(storeId)!
+      store.items.push({ ...item, total: itemTotal })
+      store.subtotal += itemTotal
     }
 
     return {
@@ -231,16 +167,14 @@ export class CartService extends BaseService {
         itemCount: summary.itemCount,
         uniqueItems: summary.uniqueItems,
         subtotal: summary.subtotal,
-        storeBreakdown: Array.from(summary.stores.entries()).map(
-          ([storeId, data]) => ({
-            storeId,
-            storeName: data.name,
-            items: data.items,
-            subtotal: data.subtotal,
-          })
-        ),
+        storeBreakdown: Array.from(summary.stores.entries()).map(([storeId, data]) => ({
+          storeId,
+          storeName: data.name,
+          items: data.items,
+          subtotal: data.subtotal,
+        })),
       },
-    };
+    }
   }
 
   private formatCartResponse(cart: any) {
@@ -258,26 +192,20 @@ export class CartService extends BaseService {
         store: item.product.store,
       },
       subtotal: Number(item.product.price) * item.quantity,
-    }));
+    }))
 
-    const total = items.reduce(
-      (sum: number, item: any) => sum + item.subtotal,
-      0
-    );
+    const total = items.reduce((sum: number, item: any) => sum + item.subtotal, 0)
 
     return {
       id: cart.id,
       userId: cart.userId,
       items,
-      itemCount: items.reduce(
-        (sum: number, item: any) => sum + item.quantity,
-        0
-      ),
+      itemCount: items.reduce((sum: number, item: any) => sum + item.quantity, 0),
       total,
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
-    };
+    }
   }
 }
 
-export const cartService = new CartService();
+export const cartService = new CartService()

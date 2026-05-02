@@ -1,306 +1,233 @@
-import { OrderStatus, Prisma } from "@prisma/client";
-import { prisma } from "../utils/prisma";
-import { BaseService } from "./base.service";
-import { cartService } from "./cart.service";
+import { db } from '../db'
+import { orders, orderItems, products, stores, shippingAddresses } from '../db/schema'
+import type { OrderStatus } from '../db/schema'
+import { eq, and, sql } from 'drizzle-orm'
+import { BaseService } from './base.service'
+import { cartService } from './cart.service'
 
 export interface ShippingAddressData {
-  street: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  phone: string;
+  street: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+  phone: string
 }
 
 export interface CreateOrderData {
-  shippingAddress: ShippingAddressData;
+  shippingAddress: ShippingAddressData
 }
 
 export interface OrderFilters {
-  userId?: string;
-  storeId?: string;
-  status?: OrderStatus;
-  storeOwnerId?: string; // Filter by store owner for sellers
+  userId?: string
+  storeId?: string
+  status?: OrderStatus
+  storeOwnerId?: string
 }
 
 export class OrderService extends BaseService {
   async createOrder(userId: string, data: CreateOrderData) {
-    const cart = await cartService.getOrCreateCart(userId);
+    const cart = await cartService.getOrCreateCart(userId)
 
     if (cart.items.length === 0) {
-      throw new Error("Cart is empty");
+      throw new Error('Cart is empty')
     }
 
-    const storeOrders = new Map<string, any[]>();
+    const storeOrders = new Map<string, any[]>()
 
     for (const item of cart.items) {
-      const storeId = item.product.store.id;
+      const storeId = item.product.store.id
       if (!storeOrders.has(storeId)) {
-        storeOrders.set(storeId, []);
+        storeOrders.set(storeId, [])
       }
-      storeOrders.get(storeId)!.push(item);
+      storeOrders.get(storeId)!.push(item)
     }
 
-    const orders = [];
+    const createdOrders = []
 
     for (const [storeId, items] of storeOrders) {
-      const orderTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+      const orderTotal = items.reduce((sum, item) => sum + item.subtotal, 0)
 
-      const order = await prisma.$transaction(async (tx) => {
+      const order = await db.transaction(async (tx) => {
         for (const item of items) {
-          const product = await tx.product.findUnique({
-            where: { id: item.product.id },
-          });
+          const product = await tx.query.products.findFirst({
+            where: eq(products.id, item.product.id),
+          })
 
           if (!product) {
-            throw new Error(`Product ${item.product.name} not found`);
+            throw new Error(`Product ${item.product.name} not found`)
           }
 
           if (product.quantity < item.quantity) {
             throw new Error(
               `Insufficient stock for ${product.name}. Available: ${product.quantity}`
-            );
+            )
           }
 
-          await tx.product.update({
-            where: { id: product.id },
-            data: {
-              quantity: product.quantity - item.quantity,
-            },
-          });
+          await tx
+            .update(products)
+            .set({ quantity: product.quantity - item.quantity })
+            .where(eq(products.id, product.id))
         }
 
-        const createdOrder = await tx.order.create({
-          data: {
+        const [createdOrder] = await tx
+          .insert(orders)
+          .values({
             userId,
             storeId,
-            total: orderTotal,
-            status: OrderStatus.PENDING,
-            items: {
-              create: items.map((item: any) => ({
-                productId: item.product.id,
-                quantity: item.quantity,
-                price: item.product.price,
-              })),
-            },
-            shippingAddress: {
-              create: data.shippingAddress,
-            },
-          },
-          include: {
-            items: {
-              include: {
-                product: {
-                  select: {
-                    id: true,
-                    name: true,
-                    images: true,
-                    sku: true,
-                  },
-                },
-              },
-            },
-            shippingAddress: true,
-            store: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
-          },
-        });
+            total: String(orderTotal),
+            status: 'PENDING',
+          })
+          .returning()
 
-        return createdOrder;
-      });
+        await tx.insert(orderItems).values(
+          items.map((item: any) => ({
+            orderId: createdOrder.id,
+            productId: item.product.id,
+            quantity: item.quantity,
+            price: String(item.product.price),
+          }))
+        )
 
-      orders.push(order);
+        await tx.insert(shippingAddresses).values({
+          orderId: createdOrder.id,
+          ...data.shippingAddress,
+        })
+
+        return this.getOrderWithDetails(tx, createdOrder.id)
+      })
+
+      createdOrders.push(order)
     }
 
-    await cartService.clearCart(userId);
+    await cartService.clearCart(userId)
 
-    return orders;
+    return createdOrders
   }
 
-  async getOrders(
-    filters: OrderFilters,
-    pagination: { page: number; limit: number }
-  ) {
-    const { page, limit, skip } = this.getPaginationParams(pagination);
+  async getOrders(filters: OrderFilters, pagination: { page: number; limit: number }) {
+    const { page, limit, skip } = this.getPaginationParams(pagination)
 
-    const where: Prisma.OrderWhereInput = {
-      ...(filters.userId && { userId: filters.userId }),
-      ...(filters.storeId && { storeId: filters.storeId }),
-      ...(filters.status && { status: filters.status }),
-      ...(filters.storeOwnerId && {
-        store: { ownerId: filters.storeOwnerId }
-      }),
-    };
+    const conditions: any[] = []
+    if (filters.userId) conditions.push(eq(orders.userId, filters.userId))
+    if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId))
+    if (filters.status) conditions.push(eq(orders.status, filters.status))
 
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
+    if (filters.storeOwnerId) {
+      // Join with stores to filter by store owner
+      const ownerStores = await db.query.stores.findMany({
+        where: eq(stores.ownerId, filters.storeOwnerId),
+        columns: { id: true },
+      })
+      const storeIds = ownerStores.map((s) => s.id)
+      if (storeIds.length > 0) {
+        conditions.push(
+          sql`${orders.storeId} IN (${sql.join(storeIds.map((id) => sql`${id}`), sql`, `)})`
+        )
+      } else {
+        return this.formatPaginatedResult([], 0, page, limit)
+      }
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+
+    const [rows, [{ total }]] = await Promise.all([
+      db.query.orders.findMany({
+        where: whereClause,
+        limit,
+        offset: skip,
+        orderBy: (o, { desc }) => [desc(o.createdAt)],
+        with: {
           items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  images: true,
-                  sku: true,
-                },
-              },
+            with: {
+              product: { columns: { id: true, name: true, images: true, sku: true } },
             },
           },
           shippingAddress: true,
-          store: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
+          store: { columns: { id: true, name: true, slug: true } },
+          user: { columns: { id: true, name: true, email: true } },
         },
       }),
-      prisma.order.count({ where }),
-    ]);
+      db.select({ total: sql<number>`count(*)::int` }).from(orders).where(whereClause),
+    ])
 
-    return this.formatPaginatedResult(orders, total, page, limit);
+    return this.formatPaginatedResult(rows, Number(total), page, limit)
   }
 
   async getOrderById(orderId: string, userId: string) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: {
         items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                images: true,
-                sku: true,
-                description: true,
-              },
-            },
+          with: {
+            product: { columns: { id: true, name: true, images: true, sku: true, description: true } },
           },
         },
         shippingAddress: true,
         store: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            owner: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
+          columns: { id: true, name: true, slug: true },
+          with: { owner: { columns: { id: true, name: true, email: true } } },
         },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        user: { columns: { id: true, name: true, email: true } },
       },
-    });
+    })
 
     if (!order) {
-      throw new Error("Order not found");
+      throw new Error('Order not found')
     }
 
     if (order.userId !== userId && order.store.owner.id !== userId) {
-      throw new Error("Not authorized to view this order");
+      throw new Error('Not authorized to view this order')
     }
 
-    return order;
+    return order
   }
 
-  async updateOrderStatus(
-    orderId: string,
-    status: OrderStatus,
-    userId: string
-  ) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        store: {
-          select: {
-            ownerId: true,
-          },
-        },
-      },
-    });
+  async updateOrderStatus(orderId: string, status: OrderStatus, userId: string) {
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: { store: { columns: { ownerId: true } } },
+    })
 
     if (!order) {
-      throw new Error("Order not found");
+      throw new Error('Order not found')
     }
 
     if (order.store.ownerId !== userId) {
-      throw new Error("Not authorized to update this order");
+      throw new Error('Not authorized to update this order')
     }
 
     const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
-      [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED],
-      [OrderStatus.CANCELLED]: [],
-      [OrderStatus.REFUNDED]: [],
-    };
+      PENDING: ['PROCESSING', 'CANCELLED'],
+      PROCESSING: ['SHIPPED', 'CANCELLED'],
+      SHIPPED: ['DELIVERED'],
+      DELIVERED: ['REFUNDED'],
+      CANCELLED: [],
+      REFUNDED: [],
+    }
 
     if (!allowedTransitions[order.status].includes(status)) {
-      throw new Error(`Cannot transition from ${order.status} to ${status}`);
+      throw new Error(`Cannot transition from ${order.status} to ${status}`)
     }
 
-    if (status === OrderStatus.CANCELLED || status === OrderStatus.REFUNDED) {
-      const orderItems = await prisma.orderItem.findMany({
-        where: { orderId },
-      });
+    if (status === 'CANCELLED' || status === 'REFUNDED') {
+      const items = await db.query.orderItems.findMany({ where: eq(orderItems.orderId, orderId) })
 
-      await prisma.$transaction(async (tx) => {
-        for (const item of orderItems) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              quantity: {
-                increment: item.quantity,
-              },
-            },
-          });
+      await db.transaction(async (tx) => {
+        for (const item of items) {
+          await tx
+            .update(products)
+            .set({ quantity: sql`${products.quantity} + ${item.quantity}` })
+            .where(eq(products.id, item.productId))
         }
 
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status },
-        });
-      });
+        await tx.update(orders).set({ status }).where(eq(orders.id, orderId))
+      })
     } else {
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status },
-      });
+      await db.update(orders).set({ status }).where(eq(orders.id, orderId))
     }
 
-    return this.getOrderById(orderId, userId);
+    return this.getOrderById(orderId, userId)
   }
 
   async getSellerOrders(
@@ -308,34 +235,37 @@ export class OrderService extends BaseService {
     filters: Omit<OrderFilters, 'storeOwnerId'> = {},
     pagination: { page: number; limit: number }
   ) {
-    return this.getOrders(
-      { 
-        ...filters, 
-        storeOwnerId: ownerId
-      },
-      pagination
-    );
+    return this.getOrders({ ...filters, storeOwnerId: ownerId }, pagination)
   }
 
-  async getStoreOrders(
-    storeId: string,
-    userId: string,
-    pagination: { page: number; limit: number }
-  ) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-    });
+  async getStoreOrders(storeId: string, userId: string, pagination: { page: number; limit: number }) {
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, storeId) })
 
     if (!store) {
-      throw new Error("Store not found");
+      throw new Error('Store not found')
     }
 
     if (store.ownerId !== userId) {
-      throw new Error("Not authorized to view store orders");
+      throw new Error('Not authorized to view store orders')
     }
 
-    return this.getOrders({ storeId }, pagination);
+    return this.getOrders({ storeId }, pagination)
+  }
+
+  private async getOrderWithDetails(tx: any, orderId: string) {
+    return tx.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: {
+        items: {
+          with: {
+            product: { columns: { id: true, name: true, images: true, sku: true } },
+          },
+        },
+        shippingAddress: true,
+        store: { columns: { id: true, name: true, slug: true } },
+      },
+    })
   }
 }
 
-export const orderService = new OrderService();
+export const orderService = new OrderService()

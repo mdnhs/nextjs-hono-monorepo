@@ -3,7 +3,6 @@ import { Context, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { authenticate, authorize } from '../auth'
 import { verifyToken } from '../../utils/auth'
-import { UserRole } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 
 // Mock the auth utils
@@ -16,7 +15,7 @@ describe('Auth Middleware', () => {
   const mockPayload = {
     userId: faker.string.uuid(),
     email: faker.internet.email(),
-    role: UserRole.BUYER
+    role: 'BUYER'
   }
   
   beforeEach(() => {
@@ -147,7 +146,7 @@ describe('Auth Middleware', () => {
   
   describe('authorize', () => {
     it('should authorize user with correct role', async () => {
-      const middleware = authorize(UserRole.BUYER)
+      const middleware = authorize('BUYER')
       mockContext.get.mockReturnValue(mockPayload)
       
       await middleware(mockContext as Context, mockNext)
@@ -157,7 +156,7 @@ describe('Auth Middleware', () => {
     })
     
     it('should authorize user with multiple allowed roles', async () => {
-      const middleware = authorize(UserRole.BUYER, UserRole.SELLER)
+      const middleware = authorize('BUYER', 'SELLER')
       mockContext.get.mockReturnValue(mockPayload)
       
       await middleware(mockContext as Context, mockNext)
@@ -167,7 +166,7 @@ describe('Auth Middleware', () => {
     })
     
     it('should throw 403 when user role not in allowed roles', async () => {
-      const middleware = authorize(UserRole.SELLER, UserRole.ADMIN)
+      const middleware = authorize('SELLER', 'ADMIN')
       mockContext.get.mockReturnValue(mockPayload) // User is BUYER
       
       await expect(middleware(mockContext as Context, mockNext))
@@ -184,7 +183,7 @@ describe('Auth Middleware', () => {
     })
     
     it('should throw 403 when no user in context', async () => {
-      const middleware = authorize(UserRole.BUYER)
+      const middleware = authorize('BUYER')
       mockContext.get.mockReturnValue(null)
       
       await expect(middleware(mockContext as Context, mockNext))
@@ -203,10 +202,10 @@ describe('Auth Middleware', () => {
     it('should allow ADMIN role to access any resource', async () => {
       const adminPayload = {
         ...mockPayload,
-        role: UserRole.ADMIN
+        role: 'ADMIN'
       }
       
-      const middleware = authorize(UserRole.ADMIN)
+      const middleware = authorize('ADMIN')
       mockContext.get.mockReturnValue(adminPayload)
       
       await middleware(mockContext as Context, mockNext)
@@ -217,11 +216,11 @@ describe('Auth Middleware', () => {
     it('should handle multiple role authorization correctly', async () => {
       const sellerPayload = {
         ...mockPayload,
-        role: UserRole.SELLER
+        role: 'SELLER'
       }
       
       // Test SELLER can access SELLER-only resources
-      const sellerOnlyMiddleware = authorize(UserRole.SELLER)
+      const sellerOnlyMiddleware = authorize('SELLER')
       mockContext.get.mockReturnValue(sellerPayload)
       
       await sellerOnlyMiddleware(mockContext as Context, mockNext)
@@ -229,7 +228,7 @@ describe('Auth Middleware', () => {
       
       // Test SELLER can access SELLER or ADMIN resources
       vi.clearAllMocks()
-      const sellerAdminMiddleware = authorize(UserRole.SELLER, UserRole.ADMIN)
+      const sellerAdminMiddleware = authorize('SELLER', 'ADMIN')
       mockContext.get.mockReturnValue(sellerPayload)
       
       await sellerAdminMiddleware(mockContext as Context, mockNext)
@@ -237,7 +236,7 @@ describe('Auth Middleware', () => {
       
       // Test SELLER cannot access BUYER-only resources
       vi.clearAllMocks()
-      const buyerOnlyMiddleware = authorize(UserRole.BUYER)
+      const buyerOnlyMiddleware = authorize('BUYER')
       mockContext.get.mockReturnValue(sellerPayload)
       
       await expect(buyerOnlyMiddleware(mockContext as Context, mockNext))

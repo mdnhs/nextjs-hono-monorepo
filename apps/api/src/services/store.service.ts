@@ -1,5 +1,8 @@
-import { StoreStatus, UserRole } from '@prisma/client'
-import { prisma } from '../utils/prisma'
+import { db } from '../db'
+import { stores, subscriptions, plans, products, orders, users } from '../db/schema'
+import type { StoreStatus, UserRole } from '../db/schema'
+import { eq, and, ne, desc, count, sql } from 'drizzle-orm'
+import { BaseService } from './base.service'
 
 export interface CreateStoreData {
   name: string
@@ -29,237 +32,208 @@ export interface PaginationParams {
   limit: number
 }
 
-export class StoreService {
+export class StoreService extends BaseService {
   async getAllStores(filters: StoreFilters, pagination: PaginationParams) {
     const skip = (pagination.page - 1) * pagination.limit
-    const where: Record<string, unknown> = {}
-    
-    if (filters.status) {
-      where.status = filters.status
-    }
-    if (filters.ownerId) {
-      where.ownerId = filters.ownerId
-    }
-    
-    const [stores, total] = await Promise.all([
-      prisma.store.findMany({
-        where,
-        skip,
-        take: pagination.limit,
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          _count: {
-            select: {
-              products: true
-            }
-          },
-          subscriptions: {
-            include: {
-              plan: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  priceMonthly: true,
-                  priceYearly: true,
-                }
-              }
-            }
-          }
+
+    const conditions = []
+    if (filters.status) conditions.push(eq(stores.status, filters.status))
+    if (filters.ownerId) conditions.push(eq(stores.ownerId, filters.ownerId))
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+
+    const [rows, [{ total }]] = await Promise.all([
+      db.query.stores.findMany({
+        where: whereClause,
+        limit: pagination.limit,
+        offset: skip,
+        orderBy: [desc(stores.createdAt)],
+        with: {
+          owner: { columns: { id: true, name: true, email: true } },
+          subscriptions: { with: { plan: { columns: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } } } },
         },
-        orderBy: {
-          createdAt: 'desc'
-        }
       }),
-      prisma.store.count({ where })
+      db.select({ total: count() }).from(stores).where(whereClause),
     ])
-    
+
+    const storeIds = rows.map((s) => s.id)
+    const productCounts = storeIds.length
+      ? await db
+          .select({ storeId: products.storeId, cnt: count() })
+          .from(products)
+          .where(sql`${products.storeId} = ANY(ARRAY[${sql.join(storeIds.map((id) => sql`${id}`), sql`, `)}]::text[])`)
+          .groupBy(products.storeId)
+      : []
+    const countMap = new Map(productCounts.map((r) => [r.storeId, Number(r.cnt)]))
+
+    const data = rows.map((s) => ({
+      ...s,
+      _count: { products: countMap.get(s.id) ?? 0 },
+    }))
+
     return {
-      data: stores,
+      data,
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
-        total,
-        totalPages: Math.ceil(total / pagination.limit)
-      }
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / pagination.limit),
+      },
     }
   }
-  
+
   async getStoreById(id: string) {
-    const store = await prisma.store.findUnique({
-      where: { id },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
+    const store = await db.query.stores.findFirst({
+      where: eq(stores.id, id),
+      with: {
+        owner: { columns: { id: true, name: true, email: true } },
         products: {
-          where: { isActive: true },
-          take: 10,
-          orderBy: { createdAt: 'desc' }
+          where: eq(products.isActive, true),
+          limit: 10,
+          orderBy: [desc(products.createdAt)],
         },
-        _count: {
-          select: {
-            products: true,
-            orders: true
-          }
-        },
-        subscriptions: {
-          include: {
-            plan: true,
-          }
-        }
-      }
+        subscriptions: { with: { plan: true } },
+      },
     })
-    
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    return store
+
+    const [{ productCount }, { orderCount }] = await Promise.all([
+      db.select({ productCount: count() }).from(products).where(eq(products.storeId, id)).then(([r]) => r),
+      db.select({ orderCount: count() }).from(orders).where(eq(orders.storeId, id)).then(([r]) => r),
+    ])
+
+    return {
+      ...store,
+      _count: { products: Number(productCount), orders: Number(orderCount) },
+    }
   }
-  
+
   async getStoreBySlug(slug: string) {
-    const store = await prisma.store.findUnique({
-      where: { slug },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
+    const store = await db.query.stores.findFirst({
+      where: eq(stores.slug, slug),
+      with: {
+        owner: { columns: { id: true, name: true, email: true } },
         products: {
-          where: { isActive: true },
-          take: 10,
-          orderBy: { createdAt: 'desc' }
+          where: eq(products.isActive, true),
+          limit: 10,
+          orderBy: [desc(products.createdAt)],
         },
-        _count: {
-          select: {
-            products: true,
-            orders: true
-          }
-        }
-      }
+      },
     })
-    
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    if (store.status !== StoreStatus.APPROVED) {
+
+    if (store.status !== 'APPROVED') {
       throw new Error('Store is not approved')
     }
-    
-    return store
+
+    const [{ productCount }, { orderCount }] = await Promise.all([
+      db.select({ productCount: count() }).from(products).where(eq(products.storeId, store.id)).then(([r]) => r),
+      db.select({ orderCount: count() }).from(orders).where(eq(orders.storeId, store.id)).then(([r]) => r),
+    ])
+
+    return {
+      ...store,
+      _count: { products: Number(productCount), orders: Number(orderCount) },
+    }
   }
-  
+
   async getUserStores(userId: string, pagination: PaginationParams) {
     const skip = (pagination.page - 1) * pagination.limit
-    const where = { ownerId: userId }
-    
-    const [stores, total] = await Promise.all([
-      prisma.store.findMany({
-        where,
-        skip,
-        take: pagination.limit,
-        include: {
-          _count: {
-            select: {
-              products: true,
-              orders: true
-            }
-          },
-          subscriptions: {
-            include: {
-              plan: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  priceMonthly: true,
-                  priceYearly: true,
-                }
-              }
-            }
-          }
+
+    const [rows, [{ total }]] = await Promise.all([
+      db.query.stores.findMany({
+        where: eq(stores.ownerId, userId),
+        limit: pagination.limit,
+        offset: skip,
+        orderBy: [desc(stores.createdAt)],
+        with: {
+          subscriptions: { with: { plan: { columns: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } } } },
         },
-        orderBy: {
-          createdAt: 'desc'
-        }
       }),
-      prisma.store.count({ where })
+      db.select({ total: count() }).from(stores).where(eq(stores.ownerId, userId)),
     ])
-    
+
+    const storeIds = rows.map((s) => s.id)
+
+    let productCounts: { storeId: string; cnt: typeof count }[] = []
+    let orderCounts: { storeId: string; cnt: typeof count }[] = []
+
+    if (storeIds.length > 0) {
+      const idList = sql`(${sql.join(storeIds.map((id) => sql`${id}`), sql`, `)})`
+      ;[productCounts, orderCounts] = await Promise.all([
+        db
+          .select({ storeId: products.storeId, cnt: count() })
+          .from(products)
+          .where(sql`${products.storeId} IN ${idList}`)
+          .groupBy(products.storeId) as any,
+        db
+          .select({ storeId: orders.storeId, cnt: count() })
+          .from(orders)
+          .where(sql`${orders.storeId} IN ${idList}`)
+          .groupBy(orders.storeId) as any,
+      ])
+    }
+
+    const productMap = new Map((productCounts as any[]).map((r) => [r.storeId, Number(r.cnt)]))
+    const orderMap = new Map((orderCounts as any[]).map((r) => [r.storeId, Number(r.cnt)]))
+
+    const data = rows.map((s) => ({
+      ...s,
+      _count: { products: productMap.get(s.id) ?? 0, orders: orderMap.get(s.id) ?? 0 },
+    }))
+
     return {
-      data: stores,
+      data,
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
-        total,
-        totalPages: Math.ceil(total / pagination.limit)
-      }
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / pagination.limit),
+      },
     }
   }
-  
+
   async createStore(data: CreateStoreData, ownerId: string) {
-    const existingStore = await prisma.store.findUnique({
-      where: { slug: data.slug }
-    })
-    
-    if (existingStore) {
+    const existingSlug = await db.query.stores.findFirst({ where: eq(stores.slug, data.slug) })
+    if (existingSlug) {
       throw new Error('Slug already exists')
     }
 
     if (data.customDomain) {
-      const existingDomain = await prisma.store.findUnique({
-        where: { customDomain: data.customDomain }
+      const existingDomain = await db.query.stores.findFirst({
+        where: eq(stores.customDomain, data.customDomain),
       })
       if (existingDomain) {
         throw new Error('Custom domain already in use')
       }
     }
-    
-    const store = await prisma.$transaction(async (tx) => {
-      const newStore = await tx.store.create({
-        data: {
+
+    return db.transaction(async (tx) => {
+      const [newStore] = await tx
+        .insert(stores)
+        .values({
           name: data.name,
           description: data.description,
           slug: data.slug,
           logo: data.logo,
           ownerId,
-          status: StoreStatus.PENDING,
+          status: 'PENDING',
           customDomain: data.customDomain || null,
-        },
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        }
-      })
+        })
+        .returning()
 
       if (data.planId) {
-        const plan = await tx.plan.findUnique({
-          where: { id: data.planId },
-        })
+        const plan = await tx.query.plans.findFirst({ where: eq(plans.id, data.planId) })
         if (plan) {
           const now = new Date()
           let currentPeriodEnd = new Date(now)
-          let status = 'TRIAL'
+          let status: 'TRIAL' | 'ACTIVE' = 'TRIAL'
 
           if (plan.trialDays > 0) {
             currentPeriodEnd = new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
@@ -268,183 +242,146 @@ export class StoreService {
             status = 'ACTIVE'
           }
 
-          await tx.subscription.create({
-            data: {
-              storeId: newStore.id,
-              planId: plan.id,
-              billingCycle: 'MONTHLY',
-              status: status as any,
-              currentPeriodStart: now,
-              currentPeriodEnd,
-            },
+          await tx.insert(subscriptions).values({
+            storeId: newStore.id,
+            planId: plan.id,
+            billingCycle: 'MONTHLY',
+            status,
+            currentPeriodStart: now,
+            currentPeriodEnd,
           })
         }
       }
 
-      return newStore
+      const owner = await tx.query.users.findFirst({
+        where: eq(users.id, ownerId),
+        columns: { id: true, name: true, email: true },
+      })
+
+      return { ...newStore, owner }
     })
-    
-    return store
   }
-  
+
   async updateStore(id: string, data: UpdateStoreData, userId: string, userRole: UserRole) {
-    const store = await prisma.store.findUnique({
-      where: { id }
-    })
-    
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, id) })
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    if (store.ownerId !== userId && userRole !== UserRole.ADMIN) {
+
+    if (store.ownerId !== userId && userRole !== 'ADMIN') {
       throw new Error('Not authorized to update this store')
     }
-    
+
     if (data.slug) {
-      const existingStore = await prisma.store.findFirst({
-        where: {
-          slug: data.slug,
-          id: { not: id }
-        }
+      const existing = await db.query.stores.findFirst({
+        where: and(eq(stores.slug, data.slug), ne(stores.id, id)),
       })
-      
-      if (existingStore) {
+      if (existing) {
         throw new Error('Slug already exists')
       }
     }
 
     if (data.customDomain) {
-      const existingDomain = await prisma.store.findFirst({
-        where: {
-          customDomain: data.customDomain,
-          id: { not: id }
-        }
+      const existing = await db.query.stores.findFirst({
+        where: and(eq(stores.customDomain, data.customDomain), ne(stores.id, id)),
       })
-      if (existingDomain) {
+      if (existing) {
         throw new Error('Custom domain already in use')
       }
     }
-    
-    const updatedStore = await prisma.store.update({
-      where: { id },
-      data,
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
+
+    const [updated] = await db.update(stores).set(data as any).where(eq(stores.id, id)).returning()
+
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, updated.ownerId),
+      columns: { id: true, name: true, email: true },
     })
-    
-    return updatedStore
+
+    return { ...updated, owner }
   }
-  
+
   async deleteStore(id: string, userId: string, userRole: UserRole) {
-    const store = await prisma.store.findUnique({
-      where: { id }
-    })
-    
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, id) })
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    if (store.ownerId !== userId && userRole !== UserRole.ADMIN) {
+
+    if (store.ownerId !== userId && userRole !== 'ADMIN') {
       throw new Error('Not authorized to delete this store')
     }
-    
-    await prisma.store.delete({
-      where: { id }
-    })
-    
+
+    await db.delete(stores).where(eq(stores.id, id))
+
     return { message: 'Store deleted successfully' }
   }
 
-  // Admin: Approve a store
   async approveStore(id: string, _adminId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id }
-    })
-    
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, id) })
+
     if (!store) {
       throw new Error('Store not found')
     }
 
-    if (store.status === StoreStatus.APPROVED) {
+    if (store.status === 'APPROVED') {
       throw new Error('Store is already approved')
     }
-    
-    const approvedStore = await prisma.store.update({
-      where: { id },
-      data: { status: StoreStatus.APPROVED },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
+
+    const [updated] = await db
+      .update(stores)
+      .set({ status: 'APPROVED' })
+      .where(eq(stores.id, id))
+      .returning()
+
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, updated.ownerId),
+      columns: { id: true, name: true, email: true },
     })
-    
-    return approvedStore
+
+    return { ...updated, owner }
   }
 
-  // Admin: Reject a store
   async rejectStore(id: string, _adminId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id }
-    })
-    
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, id) })
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    const rejectedStore = await prisma.store.update({
-      where: { id },
-      data: { status: StoreStatus.REJECTED },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
+
+    const [updated] = await db
+      .update(stores)
+      .set({ status: 'REJECTED' })
+      .where(eq(stores.id, id))
+      .returning()
+
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, updated.ownerId),
+      columns: { id: true, name: true, email: true },
     })
-    
-    return rejectedStore
+
+    return { ...updated, owner }
   }
 
-  // Admin: Suspend a store
   async suspendStore(id: string, _adminId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id }
-    })
-    
+    const store = await db.query.stores.findFirst({ where: eq(stores.id, id) })
+
     if (!store) {
       throw new Error('Store not found')
     }
-    
-    const suspendedStore = await prisma.store.update({
-      where: { id },
-      data: { status: StoreStatus.SUSPENDED },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
+
+    const [updated] = await db
+      .update(stores)
+      .set({ status: 'SUSPENDED' })
+      .where(eq(stores.id, id))
+      .returning()
+
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, updated.ownerId),
+      columns: { id: true, name: true, email: true },
     })
-    
-    return suspendedStore
+
+    return { ...updated, owner }
   }
 }
 

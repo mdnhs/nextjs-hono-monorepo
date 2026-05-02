@@ -1,6 +1,8 @@
 import { Context, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { prisma } from '../utils/prisma'
+import { db } from '../db'
+import { stores } from '../db/schema'
+import { eq, and } from 'drizzle-orm'
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -19,12 +21,10 @@ export const resolveTenant = async (c: Context, next: Next) => {
 
   let storeSlug: string | undefined
 
-  // Check for subdomain: store.example.com
   const parts = host.split(':')
   const hostname = parts[0]
   const hostParts = hostname.split('.')
 
-  // If we have a subdomain (not localhost or www)
   if (hostParts.length > 2 && !hostname.includes('localhost')) {
     const appDomain = process.env.APP_DOMAIN || 'example.com'
     const expectedDomain = `.${appDomain}`
@@ -33,7 +33,6 @@ export const resolveTenant = async (c: Context, next: Next) => {
     }
   }
 
-  // Check for path-based: /store/:slug/...
   if (!storeSlug) {
     const match = path.match(/^\/store\/([^/]+)/)
     if (match) {
@@ -41,14 +40,10 @@ export const resolveTenant = async (c: Context, next: Next) => {
     }
   }
 
-  // Check for custom domain
   if (!storeSlug) {
-    const storeByDomain = await prisma.store.findFirst({
-      where: {
-        customDomain: hostname,
-        status: 'APPROVED',
-      },
-      select: { id: true, slug: true, status: true, ownerId: true },
+    const storeByDomain = await db.query.stores.findFirst({
+      where: and(eq(stores.customDomain, hostname), eq(stores.status, 'APPROVED')),
+      columns: { id: true, slug: true, status: true, ownerId: true },
     })
 
     if (storeByDomain) {
@@ -57,14 +52,10 @@ export const resolveTenant = async (c: Context, next: Next) => {
     }
   }
 
-  // Resolve store by slug
   if (storeSlug) {
-    const store = await prisma.store.findFirst({
-      where: {
-        slug: storeSlug,
-        status: 'APPROVED',
-      },
-      select: { id: true, slug: true, status: true, ownerId: true },
+    const store = await db.query.stores.findFirst({
+      where: and(eq(stores.slug, storeSlug), eq(stores.status, 'APPROVED')),
+      columns: { id: true, slug: true, status: true, ownerId: true },
     })
 
     if (!store) {
@@ -75,7 +66,6 @@ export const resolveTenant = async (c: Context, next: Next) => {
     return next()
   }
 
-  // No tenant context - this is OK for public endpoints
   c.set('tenantStore', null)
   return next()
 }

@@ -1,11 +1,10 @@
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
 
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(2),
-  role: z.nativeEnum(UserRole).optional().default(UserRole.SELLER)
+  role: z.enum(['BUYER', 'SELLER', 'ADMIN']).optional().default('SELLER')
 })
 
 export const loginSchema = z.object({

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { UserRole } from '@prisma/client'
+import type { UserRole } from '../db/schema'
 
 const JWT_SECRET = process.env.JWT_SECRET
 if (!JWT_SECRET) {

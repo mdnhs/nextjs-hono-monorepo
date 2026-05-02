@@ -2,7 +2,9 @@ import { Context } from 'hono'
 import { BaseController } from './base.controller'
 import { storeService } from '../services/store.service'
 import { subscriptionService } from '../services/subscription.service'
-import { prisma } from '../utils/prisma'
+import { db } from '../db'
+import { stores, users, products, orders, subscriptions } from '../db/schema'
+import { eq, ne, sql, count, sum, desc } from 'drizzle-orm'
 import { z } from 'zod'
 
 const approveStoreSchema = z.object({
@@ -13,41 +15,41 @@ export class AdminController extends BaseController {
   async getDashboard(c: Context) {
     try {
       const [
-        totalStores,
-        pendingStores,
-        approvedStores,
-        totalUsers,
-        totalSellers,
-        totalProducts,
-        totalOrders,
-        totalRevenue,
+        [{ totalStores }],
+        [{ pendingStores }],
+        [{ approvedStores }],
+        [{ totalUsers }],
+        [{ totalSellers }],
+        [{ totalProducts }],
+        [{ totalOrders }],
+        [{ revenue }],
       ] = await Promise.all([
-        prisma.store.count(),
-        prisma.store.count({ where: { status: 'PENDING' } }),
-        prisma.store.count({ where: { status: 'APPROVED' } }),
-        prisma.user.count(),
-        prisma.user.count({ where: { role: 'SELLER' } }),
-        prisma.product.count(),
-        prisma.order.count(),
-        prisma.order.aggregate({
-          _sum: { total: true },
-          where: { status: { not: 'CANCELLED' } },
-        }),
+        db.select({ totalStores: count() }).from(stores),
+        db.select({ pendingStores: count() }).from(stores).where(eq(stores.status, 'PENDING')),
+        db.select({ approvedStores: count() }).from(stores).where(eq(stores.status, 'APPROVED')),
+        db.select({ totalUsers: count() }).from(users),
+        db.select({ totalSellers: count() }).from(users).where(eq(users.role, 'SELLER')),
+        db.select({ totalProducts: count() }).from(products),
+        db.select({ totalOrders: count() }).from(orders),
+        db
+          .select({ revenue: sum(orders.total) })
+          .from(orders)
+          .where(ne(orders.status, 'CANCELLED')),
       ])
 
       return c.json({
         stores: {
-          total: totalStores,
-          pending: pendingStores,
-          approved: approvedStores,
+          total: Number(totalStores),
+          pending: Number(pendingStores),
+          approved: Number(approvedStores),
         },
         users: {
-          total: totalUsers,
-          sellers: totalSellers,
+          total: Number(totalUsers),
+          sellers: Number(totalSellers),
         },
-        products: totalProducts,
-        orders: totalOrders,
-        revenue: totalRevenue._sum.total || 0,
+        products: Number(totalProducts),
+        orders: Number(totalOrders),
+        revenue: revenue ? Number(revenue) : 0,
       })
     } catch (error: any) {
       return this.handleError(error)
@@ -59,11 +61,7 @@ export class AdminController extends BaseController {
       const { page, limit } = this.getPaginationParams(c)
       const status = c.req.query('status') as any
 
-      const filters = {
-        status,
-      }
-
-      const result = await storeService.getAllStores(filters, { page, limit })
+      const result = await storeService.getAllStores({ status }, { page, limit })
       return c.json(result)
     } catch (error: any) {
       return this.handleError(error)
@@ -91,17 +89,11 @@ export class AdminController extends BaseController {
       if (planId) {
         const existing = await subscriptionService.getSubscriptionByStoreId(storeId)
         if (!existing) {
-          await subscriptionService.createSubscription({
-            storeId,
-            planId,
-          })
+          await subscriptionService.createSubscription({ storeId, planId })
         }
       }
 
-      return c.json({
-        message: 'Store approved successfully',
-        store,
-      })
+      return c.json({ message: 'Store approved successfully', store })
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -114,10 +106,7 @@ export class AdminController extends BaseController {
 
       const store = await storeService.rejectStore(storeId, user.userId)
 
-      return c.json({
-        message: 'Store rejected',
-        store,
-      })
+      return c.json({ message: 'Store rejected', store })
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -130,10 +119,7 @@ export class AdminController extends BaseController {
 
       const store = await storeService.suspendStore(storeId, user.userId)
 
-      return c.json({
-        message: 'Store suspended',
-        store,
-      })
+      return c.json({ message: 'Store suspended', store })
     } catch (error: any) {
       return this.handleError(error)
     }
@@ -142,42 +128,32 @@ export class AdminController extends BaseController {
   async getAllUsers(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const role = c.req.query('role')
+      const role = c.req.query('role') as any
       const skip = (page - 1) * limit
 
-      const where: Record<string, unknown> = {}
-      if (role) {
-        where.role = role
-      }
+      const whereClause = role ? eq(users.role, role) : undefined
 
-      const [users, total] = await Promise.all([
-        prisma.user.findMany({
-          where,
-          skip,
-          take: limit,
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            createdAt: true,
-            _count: {
-              select: { stores: true },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
+      const [rows, [{ total }]] = await Promise.all([
+        db.query.users.findMany({
+          where: whereClause,
+          limit,
+          offset: skip,
+          orderBy: [desc(users.createdAt)],
+          columns: { id: true, email: true, name: true, role: true, createdAt: true },
+          with: { stores: { columns: { id: true } } },
         }),
-        prisma.user.count({ where }),
+        db.select({ total: sql<number>`count(*)::int` }).from(users).where(whereClause),
       ])
 
+      const usersWithCount = rows.map((u) => ({
+        ...u,
+        _count: { stores: u.stores.length },
+        stores: undefined,
+      }))
+
       return c.json({
-        data: users,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: usersWithCount,
+        pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
       })
     } catch (error: any) {
       return this.handleError(error)
@@ -187,22 +163,12 @@ export class AdminController extends BaseController {
   async getUserDetails(c: Context) {
     try {
       const userId = c.req.param('id')!
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+        with: {
           stores: {
-            include: {
-              subscriptions: {
-                include: {
-                  plan: true,
-                },
-              },
-              _count: {
-                select: {
-                  products: true,
-                  orders: true,
-                },
-              },
+            with: {
+              subscriptions: { with: { plan: true } },
             },
           },
         },
@@ -221,49 +187,28 @@ export class AdminController extends BaseController {
   async getSubscriptions(c: Context) {
     try {
       const { page, limit } = this.getPaginationParams(c)
-      const status = c.req.query('status')
+      const status = c.req.query('status') as any
       const skip = (page - 1) * limit
 
-      const where: Record<string, unknown> = {}
-      if (status) {
-        where.status = status
-      }
+      const whereClause = status ? eq(subscriptions.status, status) : undefined
 
-      const [subscriptions, total] = await Promise.all([
-        prisma.subscription.findMany({
-          where,
-          skip,
-          take: limit,
-          include: {
-            store: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
-            plan: {
-              select: {
-                id: true,
-                name: true,
-                priceMonthly: true,
-                priceYearly: true,
-              },
-            },
+      const [rows, [{ total }]] = await Promise.all([
+        db.query.subscriptions.findMany({
+          where: whereClause,
+          limit,
+          offset: skip,
+          orderBy: (s, { desc }) => [desc(s.currentPeriodEnd)],
+          with: {
+            store: { columns: { id: true, name: true, slug: true } },
+            plan: { columns: { id: true, name: true, priceMonthly: true, priceYearly: true } },
           },
-          orderBy: { currentPeriodEnd: 'desc' },
         }),
-        prisma.subscription.count({ where }),
+        db.select({ total: sql<number>`count(*)::int` }).from(subscriptions).where(whereClause),
       ])
 
       return c.json({
-        data: subscriptions,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: rows,
+        pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) },
       })
     } catch (error: any) {
       return this.handleError(error)

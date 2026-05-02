@@ -1,6 +1,8 @@
-import { prisma } from '../utils/prisma'
+import { db } from '../db'
+import { subscriptions, plans, stores, products, orders } from '../db/schema'
+import type { BillingCycle, SubscriptionStatus } from '../db/schema'
+import { eq, inArray, count } from 'drizzle-orm'
 import { BaseService } from './base.service'
-import type { Subscription, BillingCycle, SubscriptionStatus } from '@prisma/client'
 
 export interface CreateSubscriptionData {
   storeId: string
@@ -10,34 +12,31 @@ export interface CreateSubscriptionData {
 }
 
 export class SubscriptionService extends BaseService {
-  async getSubscriptionByStoreId(storeId: string): Promise<Subscription | null> {
-    return prisma.subscription.findUnique({
-      where: { storeId },
-      include: {
-        plan: true,
-      },
-    })
+  async getSubscriptionByStoreId(storeId: string) {
+    return (
+      db.query.subscriptions.findFirst({
+        where: eq(subscriptions.storeId, storeId),
+        with: { plan: true },
+      }) ?? null
+    )
   }
 
-  async getSubscriptionById(id: string): Promise<Subscription | null> {
-    return prisma.subscription.findUnique({
-      where: { id },
-      include: {
-        plan: true,
-        store: true,
-      },
-    })
+  async getSubscriptionById(id: string) {
+    return (
+      db.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, id),
+        with: { plan: true, store: true },
+      }) ?? null
+    )
   }
 
-  async createSubscription(data: CreateSubscriptionData): Promise<Subscription> {
+  async createSubscription(data: CreateSubscriptionData) {
     const existing = await this.getSubscriptionByStoreId(data.storeId)
     if (existing) {
       throw new Error('Store already has an active subscription')
     }
 
-    const plan = await prisma.plan.findUnique({
-      where: { id: data.planId },
-    })
+    const plan = await db.query.plans.findFirst({ where: eq(plans.id, data.planId) })
 
     if (!plan) {
       throw new Error('Plan not found')
@@ -54,7 +53,7 @@ export class SubscriptionService extends BaseService {
       status = 'TRIAL'
       currentPeriodEnd = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000)
     } else {
-      status = billingCycle === 'MONTHLY' ? 'ACTIVE' : 'ACTIVE'
+      status = 'ACTIVE'
       currentPeriodEnd = new Date(now)
       if (billingCycle === 'MONTHLY') {
         currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1)
@@ -63,48 +62,49 @@ export class SubscriptionService extends BaseService {
       }
     }
 
-    return prisma.subscription.create({
-      data: {
+    const [sub] = await db
+      .insert(subscriptions)
+      .values({
         storeId: data.storeId,
         planId: data.planId,
         billingCycle,
         status,
         currentPeriodStart: now,
         currentPeriodEnd,
-      },
-      include: {
-        plan: true,
-      },
+      })
+      .returning()
+
+    return db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, sub.id),
+      with: { plan: true },
     })
   }
 
-  async cancelSubscription(storeId: string): Promise<Subscription> {
+  async cancelSubscription(storeId: string) {
     const subscription = await this.getSubscriptionByStoreId(storeId)
     if (!subscription) {
       throw new Error('Subscription not found')
     }
 
-    return prisma.subscription.update({
-      where: { storeId },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-      },
-      include: {
-        plan: true,
-      },
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ status: 'CANCELLED', cancelledAt: new Date() })
+      .where(eq(subscriptions.storeId, storeId))
+      .returning()
+
+    return db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, updated.id),
+      with: { plan: true },
     })
   }
 
-  async updateSubscriptionPlan(storeId: string, newPlanId: string): Promise<Subscription> {
+  async updateSubscriptionPlan(storeId: string, newPlanId: string) {
     const subscription = await this.getSubscriptionByStoreId(storeId)
     if (!subscription) {
       throw new Error('Subscription not found')
     }
 
-    const newPlan = await prisma.plan.findUnique({
-      where: { id: newPlanId },
-    })
+    const newPlan = await db.query.plans.findFirst({ where: eq(plans.id, newPlanId) })
 
     if (!newPlan) {
       throw new Error('New plan not found')
@@ -118,18 +118,21 @@ export class SubscriptionService extends BaseService {
       newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1)
     }
 
-    return prisma.subscription.update({
-      where: { storeId },
-      data: {
+    const [updated] = await db
+      .update(subscriptions)
+      .set({
         planId: newPlanId,
         currentPeriodStart: now,
         currentPeriodEnd: newPeriodEnd,
         status: 'ACTIVE',
         cancelledAt: null,
-      },
-      include: {
-        plan: true,
-      },
+      })
+      .where(eq(subscriptions.storeId, storeId))
+      .returning()
+
+    return db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, updated.id),
+      with: { plan: true },
     })
   }
 
@@ -142,9 +145,7 @@ export class SubscriptionService extends BaseService {
       throw new Error('No subscription found for store')
     }
 
-    const plan = await prisma.plan.findUnique({
-      where: { id: subscription.planId },
-    })
+    const plan = await db.query.plans.findFirst({ where: eq(plans.id, subscription.planId) })
 
     if (!plan) {
       throw new Error('Plan not found')
@@ -154,18 +155,23 @@ export class SubscriptionService extends BaseService {
     let limit: number | null
 
     switch (type) {
-      case 'products':
-        current = await prisma.product.count({ where: { storeId } })
+      case 'products': {
+        const [{ cnt }] = await db.select({ cnt: count() }).from(products).where(eq(products.storeId, storeId))
+        current = Number(cnt)
         limit = plan.maxProducts
         break
-      case 'orders':
-        current = await prisma.order.count({ where: { storeId } })
+      }
+      case 'orders': {
+        const [{ cnt }] = await db.select({ cnt: count() }).from(orders).where(eq(orders.storeId, storeId))
+        current = Number(cnt)
         limit = plan.maxOrders
         break
-      case 'storage':
+      }
+      case 'storage': {
         current = await this.getStoreStorageUsed(storeId)
         limit = plan.maxStorageMB
         break
+      }
       default:
         throw new Error('Invalid limit type')
     }
@@ -177,54 +183,61 @@ export class SubscriptionService extends BaseService {
     }
   }
 
-  async checkStoreLimit(userId: string): Promise<{ withinLimit: boolean; current: number; limit: number | null }> {
-    const storeCount = await prisma.store.count({ where: { ownerId: userId } })
-    
-    // Get the plan with the highest store limit from user's subscriptions
-    const subscriptions = await prisma.subscription.findMany({
-      where: {
-        store: { ownerId: userId },
-        status: { in: ['ACTIVE', 'TRIAL'] },
-      },
-      include: {
-        plan: true,
-      },
+  async checkStoreLimit(
+    userId: string
+  ): Promise<{ withinLimit: boolean; current: number; limit: number | null }> {
+    const [{ storeCount }] = await db
+      .select({ storeCount: count() })
+      .from(stores)
+      .where(eq(stores.ownerId, userId))
+
+    const userStores = await db.query.stores.findMany({
+      where: eq(stores.ownerId, userId),
+      columns: { id: true },
     })
 
-    // Find max store limit across all plans (null = unlimited)
+    const storeIds = userStores.map((s) => s.id)
+
     let limit: number | null = null
-    for (const sub of subscriptions) {
-      if (sub.plan.maxStores === null) {
-        limit = null
-        break
-      }
-      if (limit === null || sub.plan.maxStores > limit) {
-        limit = sub.plan.maxStores
+
+    if (storeIds.length > 0) {
+      const subs = await db.query.subscriptions.findMany({
+        where: inArray(subscriptions.storeId, storeIds),
+        with: { plan: true },
+      })
+
+      const activeSubs = subs.filter((s) => s.status === 'ACTIVE' || s.status === 'TRIAL')
+
+      for (const sub of activeSubs) {
+        if (sub.plan.maxStores === null) {
+          limit = null
+          break
+        }
+        if (limit === null || sub.plan.maxStores > limit) {
+          limit = sub.plan.maxStores
+        }
       }
     }
 
     return {
-      withinLimit: limit === null || storeCount < limit,
-      current: storeCount,
+      withinLimit: limit === null || Number(storeCount) < limit,
+      current: Number(storeCount),
       limit,
     }
   }
 
   private async getStoreStorageUsed(storeId: string): Promise<number> {
-    const products = await prisma.product.findMany({
-      where: { storeId },
-      select: { images: true },
+    const storeProducts = await db.query.products.findMany({
+      where: eq(products.storeId, storeId),
+      columns: { images: true },
     })
 
-    // Rough estimate: assume each image URL averages ~100 bytes of metadata
-    // In production, you'd track actual file sizes
     let totalImages = 0
-    for (const product of products) {
+    for (const product of storeProducts) {
       totalImages += product.images.length
     }
 
-    // Return a placeholder - in production, integrate with S3/storage service
-    return totalImages * 2 // MB estimate
+    return totalImages * 2
   }
 }
 

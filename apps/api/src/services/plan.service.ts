@@ -1,6 +1,7 @@
-import { prisma } from '../utils/prisma'
+import { db } from '../db'
+import { plans, subscriptions } from '../db/schema'
 import { BaseService } from './base.service'
-import type { Plan, Prisma } from '@prisma/client'
+import { eq, asc, count } from 'drizzle-orm'
 
 export interface CreatePlanData {
   name: string
@@ -41,75 +42,68 @@ export interface UpdatePlanData {
 }
 
 export class PlanService extends BaseService {
-  async getAllPlans(): Promise<Plan[]> {
-    return prisma.plan.findMany({
-      orderBy: { priceMonthly: 'asc' },
+  async getAllPlans() {
+    return db.select().from(plans).orderBy(asc(plans.priceMonthly))
+  }
+
+  async getActivePlans() {
+    return db.query.plans.findMany({
+      where: eq(plans.status, 'ACTIVE'),
+      orderBy: [asc(plans.priceMonthly)],
     })
   }
 
-  async getActivePlans(): Promise<Plan[]> {
-    return prisma.plan.findMany({
-      where: { status: 'ACTIVE' },
-      orderBy: { priceMonthly: 'asc' },
-    })
+  async getPlanById(id: string) {
+    return db.query.plans.findFirst({ where: eq(plans.id, id) }) ?? null
   }
 
-  async getPlanById(id: string): Promise<Plan | null> {
-    return prisma.plan.findUnique({
-      where: { id },
-    })
+  async getPlanBySlug(slug: string) {
+    return db.query.plans.findFirst({ where: eq(plans.slug, slug) }) ?? null
   }
 
-  async getPlanBySlug(slug: string): Promise<Plan | null> {
-    return prisma.plan.findUnique({
-      where: { slug },
-    })
-  }
-
-  async createPlan(data: CreatePlanData): Promise<Plan> {
-    return prisma.plan.create({
-      data: {
+  async createPlan(data: CreatePlanData) {
+    const [plan] = await db
+      .insert(plans)
+      .values({
         ...data,
-        features: data.features as Prisma.JsonObject,
-      },
-    })
+        priceMonthly: String(data.priceMonthly),
+        priceYearly: String(data.priceYearly),
+        features: (data.features as any) ?? {},
+      })
+      .returning()
+    return plan
   }
 
-  async updatePlan(id: string, data: UpdatePlanData): Promise<Plan> {
-    const plan = await this.getPlanById(id)
-    if (!plan) {
+  async updatePlan(id: string, data: UpdatePlanData) {
+    const existing = await this.getPlanById(id)
+    if (!existing) {
       throw new Error('Plan not found')
     }
 
-    const { features, ...rest } = data
-    const updateData: Prisma.PlanUpdateInput = rest
-    if (features !== undefined) {
-      updateData.features = features as unknown as Prisma.InputJsonValue
-    }
+    const updateData: Record<string, unknown> = { ...data }
+    if (data.priceMonthly !== undefined) updateData.priceMonthly = String(data.priceMonthly)
+    if (data.priceYearly !== undefined) updateData.priceYearly = String(data.priceYearly)
 
-    return prisma.plan.update({
-      where: { id },
-      data: updateData,
-    })
+    const [plan] = await db.update(plans).set(updateData as any).where(eq(plans.id, id)).returning()
+    return plan
   }
 
-  async deletePlan(id: string): Promise<void> {
-    const plan = await this.getPlanById(id)
-    if (!plan) {
+  async deletePlan(id: string) {
+    const existing = await this.getPlanById(id)
+    if (!existing) {
       throw new Error('Plan not found')
     }
 
-    const subscriptionCount = await prisma.subscription.count({
-      where: { planId: id },
-    })
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(subscriptions)
+      .where(eq(subscriptions.planId, id))
 
-    if (subscriptionCount > 0) {
+    if (Number(total) > 0) {
       throw new Error('Cannot delete plan with active subscriptions')
     }
 
-    await prisma.plan.delete({
-      where: { id },
-    })
+    await db.delete(plans).where(eq(plans.id, id))
   }
 }
 
