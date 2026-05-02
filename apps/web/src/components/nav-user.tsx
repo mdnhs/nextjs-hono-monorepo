@@ -20,8 +20,23 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { IconSelector, IconSparkles, IconRosetteDiscountCheck, IconCreditCard, IconBell, IconLogout, IconSun, IconMoon } from "@tabler/icons-react"
+import { IconSelector, IconSparkles, IconRosetteDiscountCheck, IconCreditCard, IconBell, IconLogout, IconSun, IconMoon, IconWorld } from "@tabler/icons-react"
 import { useTheme } from "next-themes"
+import { useLocale } from "next-intl"
+import { useRouter } from "next/navigation"
+import { useTransition } from "react"
+import { setLocale } from "@/lib/translation/actions"
+import { LOCALES, type Locale } from "@/lib/translation/locale/constants"
+import {
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu"
+
+const LOCALE_LABELS: Record<Locale, string> = {
+  en: 'English',
+  bn: 'বাংলা',
+};
 
 export function NavUser({
   user,
@@ -34,6 +49,17 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { theme, setTheme } = useTheme()
+  const locale = useLocale() as Locale;
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function switchLocale(next: Locale) {
+    if (next === locale) return;
+    startTransition(async () => {
+      await setLocale(next);
+      router.refresh();
+    });
+  }
 
   return (
     <SidebarMenu>
@@ -89,6 +115,23 @@ export function NavUser({
                   </>
                 )}
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isPending}>
+                  <IconWorld />
+                  <span>Language</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {LOCALES.map((l) => (
+                    <DropdownMenuItem
+                      key={l}
+                      onClick={() => switchLocale(l)}
+                      className={l === locale ? 'font-semibold' : ''}
+                    >
+                      {LOCALE_LABELS[l]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
