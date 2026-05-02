@@ -1,0 +1,32 @@
+{
+  "common": {
+    "save": "সংরক্ষণ করুন",
+    "cancel": "বাতিল",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা করুন",
+    "create": "তৈরি করুন",
+    "loading": "লোড হচ্ছে...",
+    "error": "কিছু একটা ভুল হয়েছে",
+    "noData": "কোনো ডেটা পাওয়া যায়নি",
+    "confirm": "নিশ্চিত করুন"
+  },
+  "auth": {
+    "login": "সাইন ইন",
+    "logout": "লগআউট",
+    "register": "অ্যাকাউন্ট তৈরি করুন",
+    "email": "ইমেইল",
+    "password": "পাসওয়ার্ড",
+    "confirmPassword": "পাসওয়ার্ড নিশ্চিত করুন",
+    "firstName": "প্রথম নাম",
+    "lastName": "শেষ নাম",
+    "storeName": "স্টোরের নাম",
+    "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
+    "roleAdmin": "অ্যাডমিন",
+    "roleSeller": "বিক্রেতা",
+    "noAccount": "অ্যাকাউন্ট নেই?",
+    "alreadyHaveAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?"
+  },
+  "nav": {
+    "dashboard": "ড্যাশবোর্ড"
+  }
+}

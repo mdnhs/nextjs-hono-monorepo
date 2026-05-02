@@ -1,0 +1,32 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "noData": "No data found",
+    "confirm": "Confirm"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Logout",
+    "register": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "storeName": "Store name",
+    "forgotPassword": "Forgot password?",
+    "roleAdmin": "Admin",
+    "roleSeller": "Seller",
+    "noAccount": "No account?",
+    "alreadyHaveAccount": "Already have an account?"
+  },
+  "nav": {
+    "dashboard": "Dashboard"
+  }
+}

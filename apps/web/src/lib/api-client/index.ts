@@ -221,6 +221,7 @@ export const apiRequest = async <T>(url: string, options: RequestInit = {}): Pro
   try {
     const fullUrl = buildFullUrl(url);
     const requestOptions: RequestInit = {
+      credentials: 'include',
       ...options,
       headers: await createHeaders(options.headers),
     };

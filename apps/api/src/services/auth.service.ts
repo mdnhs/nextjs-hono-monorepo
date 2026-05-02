@@ -28,6 +28,7 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(data.password)
 
+    const now = new Date()
     const [user] = await db
       .insert(users)
       .values({
@@ -35,6 +36,8 @@ export class AuthService {
         password: hashedPassword,
         name: data.name,
         role: data.role || 'BUYER',
+        createdAt: now,
+        updatedAt: now,
       })
       .returning({
         id: users.id,
