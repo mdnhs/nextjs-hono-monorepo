@@ -6,7 +6,27 @@ import { eq, and } from 'drizzle-orm'
 import type { UserRole } from '../db/schema'
 
 export const PERMISSIONS = {
-...
+  // SaaS platform admin
+  PLATFORM_DASHBOARD: 'platform:dashboard',
+  PLATFORM_STORES_READ: 'platform:stores:read',
+  PLATFORM_STORES_MANAGE: 'platform:stores:manage',
+  PLATFORM_USERS_READ: 'platform:users:read',
+  PLATFORM_USERS_MANAGE: 'platform:users:manage',
+  PLATFORM_PLANS_MANAGE: 'platform:plans:manage',
+  PLATFORM_SUBSCRIPTIONS_READ: 'platform:subscriptions:read',
+  PLATFORM_SUBSCRIPTIONS_MANAGE: 'platform:subscriptions:manage',
+  PLATFORM_ORDERS_READ: 'platform:orders:read',
+
+  // Seller panel (scoped to own stores)
+  SELLER_DASHBOARD: 'seller:dashboard',
+  SELLER_STORES_MANAGE: 'seller:stores:manage',
+  SELLER_PRODUCTS_MANAGE: 'seller:products:manage',
+  SELLER_ORDERS_MANAGE: 'seller:orders:manage',
+  SELLER_SUBSCRIPTION_MANAGE: 'seller:subscription:manage',
+  SELLER_ANALYTICS: 'seller:analytics',
+
+  // Buyer
+  BUYER_CART: 'buyer:cart',
   BUYER_ORDERS: 'buyer:orders',
   BUYER_REVIEWS: 'buyer:reviews',
 
