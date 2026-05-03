@@ -10,8 +10,9 @@ import { HTTPException } from "hono/http-exception";
 import authRouter from "./routes/auth";
 import storesRouter from "./routes/stores";
 import productsRouter from "./routes/products";
-import cartRouter from "./routes/cart";
 import ordersRouter from "./routes/orders";
+import storefrontCartRouter from "./routes/storefront-cart";
+import storefrontCheckoutRouter from "./routes/storefront-checkout";
 import reviewsRouter from "./routes/reviews";
 import categoryRoutes from "./routes/category.routes";
 import planRouter from "./routes/plans";
@@ -23,6 +24,8 @@ import swaggerRouter from "./routes/swagger";
 import cmsRouter from "./routes/cms";
 import staffRouter from "./routes/staff";
 import assetsRouter from "./routes/assets";
+import themesRouter from "./routes/themes";
+import domainsRouter from "./routes/domains";
 import { resolveTenant } from "./middlewares/tenant";
 
 const app = new Hono();
@@ -78,6 +81,15 @@ const PUBLIC_PREFIXES = [
   { method: "GET", path: "/api/v1/plans/" },
   // Payment webhooks: provider-signed, must bypass our JWT auth.
   { method: "POST", path: "/api/v1/payments/webhooks/" },
+  // Storefront cart + checkout: own customer-token auth, runs without platform JWT.
+  { method: "GET", path: "/api/v1/storefront/" },
+  { method: "POST", path: "/api/v1/storefront/" },
+  { method: "PATCH", path: "/api/v1/storefront/" },
+  { method: "DELETE", path: "/api/v1/storefront/" },
+  // Public theme read for storefronts.
+  { method: "GET", path: "/api/v1/themes/published" },
+  // Caddy on-demand TLS hook: must be reachable without auth.
+  { method: "GET", path: "/api/v1/domains/check" },
 ];
 
 const PRIVATE_EXCEPTIONS = [
@@ -141,7 +153,8 @@ app.get("/", (c) => {
       auth: "/api/v1/auth",
       stores: "/api/v1/stores",
       products: "/api/v1/products",
-      cart: "/api/v1/cart",
+      storefrontCart: "/api/v1/storefront/cart",
+      storefrontCheckout: "/api/v1/storefront/checkout",
       orders: "/api/v1/orders",
       reviews: "/api/v1/reviews",
       categories: "/api/v1/categories",
@@ -163,7 +176,8 @@ app.get("/health", (c) => {
 app.route("/api/v1/auth", authRouter);
 app.route("/api/v1/stores", storesRouter);
 app.route("/api/v1/products", productsRouter);
-app.route("/api/v1/cart", cartRouter);
+app.route("/api/v1/storefront/cart", storefrontCartRouter);
+app.route("/api/v1/storefront/checkout", storefrontCheckoutRouter);
 app.route("/api/v1/orders", ordersRouter);
 app.route("/api/v1/reviews", reviewsRouter);
 app.route("/api/v1/categories", categoryRoutes);
@@ -175,6 +189,8 @@ app.route("/api/v1/webhooks", webhooksRouter);
 app.route("/api/v1/cms", cmsRouter);
 app.route("/api/v1/staff", staffRouter);
 app.route("/api/v1/assets", assetsRouter);
+app.route("/api/v1/themes", themesRouter);
+app.route("/api/v1/domains", domainsRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

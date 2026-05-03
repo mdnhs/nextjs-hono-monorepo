@@ -171,9 +171,23 @@ export class StoreService extends BaseService {
   async getUserStores(userId: string, pagination: PaginationParams) {
     const skip = (pagination.page - 1) * pagination.limit
 
+    // 1. Get IDs of stores where user is a staff member
+    const userStaffEntries = await db.query.storeStaffs.findMany({
+      where: eq(storeStaffs.userId, userId),
+      columns: { storeId: true }
+    })
+    const staffStoreIds = userStaffEntries.map(s => s.storeId)
+
+    // 2. Build conditions: Owned OR Staff
+    const conditions = [eq(stores.ownerId, userId)]
+    if (staffStoreIds.length > 0) {
+      conditions.push(inArray(stores.id, staffStoreIds))
+    }
+    const whereClause = or(...conditions)
+
     const [rows, [{ total }]] = await Promise.all([
       db.query.stores.findMany({
-        where: eq(stores.ownerId, userId),
+        where: whereClause,
         limit: pagination.limit,
         offset: skip,
         orderBy: [desc(stores.createdAt)],
@@ -181,7 +195,7 @@ export class StoreService extends BaseService {
           subscriptions: { with: { plan: { columns: { id: true, name: true, slug: true, priceMonthly: true, priceYearly: true } } } },
         },
       }),
-      db.select({ total: count() }).from(stores).where(eq(stores.ownerId, userId)),
+      db.select({ total: count() }).from(stores).where(whereClause),
     ])
 
     const storeIds = rows.map((s) => s.id)
@@ -332,7 +346,7 @@ export class StoreService extends BaseService {
       throw new Error('Store not found')
     }
 
-    if (store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to update this store')
     }
 
@@ -386,7 +400,7 @@ export class StoreService extends BaseService {
       throw new Error('Store not found')
     }
 
-    if (store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to delete this store')
     }
 

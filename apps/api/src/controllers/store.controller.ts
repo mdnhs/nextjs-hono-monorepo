@@ -14,7 +14,7 @@ export class StoreController extends BaseController {
   async getAllStores(c: Context) {
     try {
       const user = c.get('user')
-      const isAdmin = user?.role === 'ADMIN'
+      const isAdmin = user?.role === 'PLATFORM_ADMIN'
       
       // Public users (or non-admins) should only see APPROVED stores
       const status = isAdmin 
@@ -40,7 +40,7 @@ export class StoreController extends BaseController {
       const id = c.req.param('id')!
       const store = await storeService.getStoreById(id)
       
-      if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
+      if (store.status !== 'APPROVED' && user?.role !== 'PLATFORM_ADMIN' && store.ownerId !== user?.userId) {
         return c.json({
           data: null,
           error: true,
@@ -155,7 +155,7 @@ export class StoreController extends BaseController {
       const storeId = c.req.param('id')!
       
       const store = await storeService.getStoreById(storeId)
-      if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
+      if (store.ownerId !== user.userId && user.role !== 'PLATFORM_ADMIN') {
         return c.json({
           data: null,
           error: true,
@@ -185,7 +185,7 @@ export class StoreController extends BaseController {
       const storeId = c.req.param('id')!
       
       const store = await storeService.getStoreById(storeId)
-      if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
+      if (store.ownerId !== user.userId && user.role !== 'PLATFORM_ADMIN') {
         return c.json({
           data: null,
           error: true,
@@ -208,7 +208,7 @@ export class StoreController extends BaseController {
       const { planId } = await this.parseBody(c, upgradeSubscriptionSchema)
       
       const store = await storeService.getStoreById(storeId)
-      if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
+      if (store.ownerId !== user.userId && user.role !== 'PLATFORM_ADMIN') {
         return c.json({
           data: null,
           error: true,
@@ -230,7 +230,7 @@ export class StoreController extends BaseController {
       const storeId = c.req.param('id')!
       
       const store = await storeService.getStoreById(storeId)
-      if (store.ownerId !== user.userId && user.role !== 'ADMIN') {
+      if (store.ownerId !== user.userId && user.role !== 'PLATFORM_ADMIN') {
         return c.json({
           data: null,
           error: true,

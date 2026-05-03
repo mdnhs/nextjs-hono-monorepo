@@ -1,8 +1,31 @@
 import { db } from '../db'
-import { subscriptions, plans, stores, products, orders } from '../db/schema'
+import { subscriptions, plans, stores, products, orders, assets } from '../db/schema'
 import type { BillingCycle, SubscriptionStatus } from '../db/schema'
-import { eq, inArray, count } from 'drizzle-orm'
+import { eq, inArray, count, sum } from 'drizzle-orm'
 import { BaseService } from './base.service'
+import { LRU } from '../utils/lru'
+
+// Per-store subscription+plan cache. 30s TTL — short enough that plan changes propagate quickly,
+// long enough to amortize cost when a single seller hammers product/asset creates.
+interface CachedPlan {
+  storeId: string
+  status: string
+  maxStores: number | null
+  maxProducts: number | null
+  maxOrders: number | null
+  maxStorageMB: number
+}
+const PLAN_CACHE = new LRU<string, CachedPlan | null>(2048, 30_000)
+const STORE_LIMIT_CACHE = new LRU<string, { limit: number | null }>(2048, 30_000)
+
+export const invalidatePlanCache = (storeId?: string) => {
+  if (storeId) PLAN_CACHE.delete(storeId)
+  else PLAN_CACHE.clear()
+}
+export const invalidateStoreLimitCache = (userId?: string) => {
+  if (userId) STORE_LIMIT_CACHE.delete(userId)
+  else STORE_LIMIT_CACHE.clear()
+}
 
 export interface CreateSubscriptionData {
   storeId: string
@@ -74,6 +97,8 @@ export class SubscriptionService extends BaseService {
       })
       .returning()
 
+    invalidatePlanCache(data.storeId)
+    invalidateStoreLimitCache()
     return db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, sub.id),
       with: { plan: true },
@@ -92,6 +117,7 @@ export class SubscriptionService extends BaseService {
       .where(eq(subscriptions.storeId, storeId))
       .returning()
 
+    invalidatePlanCache(storeId)
     return db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, updated.id),
       with: { plan: true },
@@ -130,25 +156,76 @@ export class SubscriptionService extends BaseService {
       .where(eq(subscriptions.storeId, storeId))
       .returning()
 
+    invalidatePlanCache(storeId)
     return db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, updated.id),
       with: { plan: true },
     })
   }
 
+  // Reads plan caps from cache; falls back to DB. Returns null if no subscription (caller decides what to do).
+  // Cron entrypoint. Flips ACTIVE/TRIAL subscriptions to EXPIRED when their period has elapsed.
+  // Returns the number of rows touched. Caller (worker) emits webhook events.
+  async expireOverdueSubscriptions(): Promise<{ expiredStoreIds: string[] }> {
+    const now = new Date()
+    const overdue = await db.query.subscriptions.findMany({
+      where: (s, { and, inArray, lt }) =>
+        and(inArray(s.status, ['ACTIVE', 'TRIAL'] as const), lt(s.currentPeriodEnd, now)),
+      columns: { id: true, storeId: true },
+    })
+    if (overdue.length === 0) return { expiredStoreIds: [] }
+
+    await db
+      .update(subscriptions)
+      .set({ status: 'EXPIRED', expiresAt: now })
+      .where(
+        inArray(
+          subscriptions.id,
+          overdue.map((s) => s.id),
+        ),
+      )
+
+    for (const s of overdue) invalidatePlanCache(s.storeId)
+    return { expiredStoreIds: overdue.map((s) => s.storeId) }
+  }
+
+  private async loadCachedPlan(storeId: string): Promise<CachedPlan | null> {
+    const cached = PLAN_CACHE.get(storeId)
+    if (cached !== undefined) return cached
+
+    const sub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.storeId, storeId),
+      with: { plan: true },
+    })
+
+    const value: CachedPlan | null = sub
+      ? {
+          storeId,
+          status: sub.status,
+          maxStores: sub.plan.maxStores,
+          maxProducts: sub.plan.maxProducts,
+          maxOrders: sub.plan.maxOrders,
+          maxStorageMB: sub.plan.maxStorageMB,
+        }
+      : null
+    PLAN_CACHE.set(storeId, value)
+    return value
+  }
+
   async checkPlanLimits(
     storeId: string,
-    type: 'products' | 'orders' | 'storage'
-  ): Promise<{ withinLimit: boolean; current: number; limit: number | null }> {
-    const subscription = await this.getSubscriptionByStoreId(storeId)
-    if (!subscription) {
-      throw new Error('No subscription found for store')
+    type: 'products' | 'orders' | 'storage',
+    delta = 1,
+  ): Promise<{ withinLimit: boolean; current: number; limit: number | null; status: string | null }> {
+    const cached = await this.loadCachedPlan(storeId)
+    if (!cached) {
+      // No subscription = no plan caps available. Treat as locked (force seller to subscribe).
+      return { withinLimit: false, current: 0, limit: 0, status: null }
     }
 
-    const plan = await db.query.plans.findFirst({ where: eq(plans.id, subscription.planId) })
-
-    if (!plan) {
-      throw new Error('Plan not found')
+    // Suspended subs cannot accrue more usage either.
+    if (cached.status === 'CANCELLED' || cached.status === 'EXPIRED' || cached.status === 'PAST_DUE') {
+      return { withinLimit: false, current: 0, limit: 0, status: cached.status }
     }
 
     let current: number
@@ -158,18 +235,23 @@ export class SubscriptionService extends BaseService {
       case 'products': {
         const [{ cnt }] = await db.select({ cnt: count() }).from(products).where(eq(products.storeId, storeId))
         current = Number(cnt)
-        limit = plan.maxProducts
+        limit = cached.maxProducts
         break
       }
       case 'orders': {
         const [{ cnt }] = await db.select({ cnt: count() }).from(orders).where(eq(orders.storeId, storeId))
         current = Number(cnt)
-        limit = plan.maxOrders
+        limit = cached.maxOrders
         break
       }
       case 'storage': {
-        current = await this.getStoreStorageUsed(storeId)
-        limit = plan.maxStorageMB
+        // Sum of Asset.sizeBytes, expressed in MB. delta arrives in MB too.
+        const [row] = await db
+          .select({ total: sum(assets.sizeBytes) })
+          .from(assets)
+          .where(eq(assets.storeId, storeId))
+        current = Math.ceil(Number(row?.total ?? 0) / (1024 * 1024))
+        limit = cached.maxStorageMB
         break
       }
       default:
@@ -177,9 +259,10 @@ export class SubscriptionService extends BaseService {
     }
 
     return {
-      withinLimit: limit === null || current < limit,
+      withinLimit: limit === null || current + delta <= limit,
       current,
       limit,
+      status: cached.status,
     }
   }
 
@@ -226,19 +309,6 @@ export class SubscriptionService extends BaseService {
     }
   }
 
-  private async getStoreStorageUsed(storeId: string): Promise<number> {
-    const storeProducts = await db.query.products.findMany({
-      where: eq(products.storeId, storeId),
-      columns: { images: true },
-    })
-
-    let totalImages = 0
-    for (const product of storeProducts) {
-      totalImages += product.images.length
-    }
-
-    return totalImages * 2
-  }
 }
 
 export const subscriptionService = new SubscriptionService()

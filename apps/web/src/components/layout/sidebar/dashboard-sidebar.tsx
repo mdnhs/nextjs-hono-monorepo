@@ -12,13 +12,13 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar"
-import { IconLayoutDashboard, IconShoppingBag, IconHeart, IconUser, IconSettings, IconStar, IconPackage, IconShield } from "@tabler/icons-react"
+import { IconLayoutDashboard, IconUser, IconPackage, IconShield, IconBuildingStore, IconCreditCard, IconPlus } from "@tabler/icons-react"
 
 const teams = [
   {
-    name: "My Dashboard",
-    logo: <IconStar />,
-    plan: "Buyer",
+    name: "Seller Central",
+    logo: <IconBuildingStore />,
+    plan: "Seller",
   },
 ]
 
@@ -30,26 +30,26 @@ const navItems = [
     isActive: true,
     items: [
       { title: "Summary", url: "/dashboard" },
-      { title: "Recent Activity", url: "/dashboard/activity" },
+      { title: "Stores", url: "/dashboard" },
+      { title: "Activity", url: "/dashboard/activity" },
     ],
   },
   {
-    title: "My Orders",
-    url: "/dashboard/orders",
-    icon: <IconShoppingBag />,
+    title: "Store Management",
+    url: "/dashboard/stores",
+    icon: <IconPackage />,
     items: [
-      { title: "All Orders", url: "/dashboard/orders" },
-      { title: "Pending", url: "/dashboard/orders?status=pending" },
-      { title: "Shipped", url: "/dashboard/orders?status=shipped" },
-      { title: "Delivered", url: "/dashboard/orders?status=delivered" },
+      { title: "All Stores", url: "/dashboard" },
+      { title: "Create Store", url: "/dashboard/stores/new" },
     ],
   },
   {
-    title: "Wishlist",
-    url: "/dashboard/wishlist",
-    icon: <IconHeart />,
+    title: "Billing & Plans",
+    url: "/dashboard/billing",
+    icon: <IconCreditCard />,
     items: [
-      { title: "Saved Items", url: "/dashboard/wishlist" },
+      { title: "Subscription", url: "/dashboard/billing" },
+      { title: "Invoices", url: "/dashboard/billing/invoices" },
     ],
   },
   {
@@ -58,37 +58,28 @@ const navItems = [
     icon: <IconUser />,
     items: [
       { title: "Profile", url: "/account/profile" },
-      { title: "Addresses", url: "/account/addresses" },
-      { title: "Payment Methods", url: "/account/payment-methods" },
-    ],
-  },
-  {
-    title: "Settings",
-    url: "/account/settings",
-    icon: <IconSettings />,
-    items: [
-      { title: "Preferences", url: "/account/settings" },
       { title: "Security", url: "/account/settings/security" },
+      { title: "Settings", url: "/account/settings" },
     ],
   },
 ]
 
 const projects = [
   {
-    name: "Recent Orders",
-    url: "/dashboard/orders?sort=recent",
-    icon: <IconPackage />,
+    name: "Create Store",
+    url: "/dashboard/stores/new",
+    icon: <IconPlus />,
   },
   {
-    name: "Wishlist",
-    url: "/dashboard/wishlist",
-    icon: <IconHeart />,
+    name: "SaaS Support",
+    url: "/support",
+    icon: <IconShield />,
   },
 ]
 
 const user = {
-  name: "Buyer",
-  email: "buyer@example.com",
+  name: "Seller Account",
+  email: "seller@example.com",
   avatar: "",
 }
 

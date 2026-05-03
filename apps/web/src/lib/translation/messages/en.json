@@ -21,8 +21,10 @@
     "lastName": "Last name",
     "storeName": "Store name",
     "forgotPassword": "Forgot password?",
-    "roleAdmin": "Admin",
+    "rolePlatformAdmin": "Platform Admin",
     "roleSeller": "Seller",
+    "roleStoreAdmin": "Store Staff",
+    "roleBuyer": "Buyer",
     "noAccount": "No account?",
     "alreadyHaveAccount": "Already have an account?"
   },

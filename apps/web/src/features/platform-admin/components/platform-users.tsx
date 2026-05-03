@@ -43,8 +43,9 @@ function TableSkeleton() {
 
 const ROLE_TABS = [
   { value: 'all', label: 'All Roles' },
-  { value: 'admin', label: 'Admin' },
+  { value: 'platform_admin', label: 'Platform Admin' },
   { value: 'seller', label: 'Sellers' },
+  { value: 'store_admin', label: 'Store Staff' },
   { value: 'buyer', label: 'Buyers' },
 ];
 

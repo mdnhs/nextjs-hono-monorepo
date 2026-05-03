@@ -41,7 +41,7 @@ const features: Feature[] = [
     icon: Shield,
     title: 'Role-Based Access',
     description:
-      'Granular permission layers for Admins, Sellers, and Buyers. Each role sees exactly what they need, nothing more.',
+      'Granular permission layers for Admins, Sellers, Staff, and Buyers. Each role sees exactly what they need, nothing more.',
     tag: 'Security',
   },
   {

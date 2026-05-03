@@ -112,7 +112,7 @@ const projects = [
 ]
 
 const user = {
-  name: "Admin",
+  name: "Platform Admin",
   email: "admin@example.com",
   avatar: "",
 }

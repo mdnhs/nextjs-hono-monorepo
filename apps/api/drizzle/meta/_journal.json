@@ -22,6 +22,34 @@
       "when": 1777794617209,
       "tag": "0002_massive_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777801952497,
+      "tag": "0003_silly_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777803536506,
+      "tag": "0004_conscious_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777803851374,
+      "tag": "0005_flat_shape",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777803969713,
+      "tag": "0006_jazzy_maddog",
+      "breakpoints": true
     }
   ]
 }

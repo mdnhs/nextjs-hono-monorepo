@@ -13,6 +13,8 @@ export const WEBHOOK_TOPICS = {
   PRODUCT_UPDATED: 'product.updated',
   PRODUCT_DELETED: 'product.deleted',
   CUSTOMER_CREATED: 'customer.created',
+  CART_ABANDONED: 'cart.abandoned',
+  SUBSCRIPTION_EXPIRED: 'subscription.expired',
 } as const
 
 export type WebhookTopic = (typeof WEBHOOK_TOPICS)[keyof typeof WEBHOOK_TOPICS]

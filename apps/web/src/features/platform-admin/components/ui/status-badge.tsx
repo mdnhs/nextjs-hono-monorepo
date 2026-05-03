@@ -5,7 +5,7 @@ type StatusVariant =
   | 'PENDING' | 'TRIAL' | 'PROCESSING'
   | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
   | 'SUSPENDED' | 'PAST_DUE' | 'REFUNDED'
-  | 'SHIPPED' | 'HIDDEN' | 'BUYER' | 'SELLER' | 'ADMIN';
+  | 'SHIPPED' | 'HIDDEN' | 'BUYER' | 'SELLER' | 'STORE_ADMIN' | 'PLATFORM_ADMIN';
 
 const VARIANT_STYLES: Record<string, string> = {
   APPROVED:   'bg-emerald-50 text-emerald-700 ring-emerald-200/60',
@@ -24,7 +24,8 @@ const VARIANT_STYLES: Record<string, string> = {
   REFUNDED:   'bg-zinc-100  text-zinc-500    ring-zinc-200/60',
   BUYER:      'bg-zinc-100  text-zinc-600    ring-zinc-200/60',
   SELLER:     'bg-blue-50   text-blue-700    ring-blue-200/60',
-  ADMIN:      'bg-violet-50 text-violet-700  ring-violet-200/60',
+  STORE_ADMIN: 'bg-indigo-50 text-indigo-700 ring-indigo-200/60',
+  PLATFORM_ADMIN: 'bg-violet-50 text-violet-700 ring-violet-200/60',
 };
 
 const DOT_COLORS: Record<string, string> = {

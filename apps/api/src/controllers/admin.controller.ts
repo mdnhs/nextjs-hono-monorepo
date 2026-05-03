@@ -20,6 +20,8 @@ export class AdminController extends BaseController {
         [{ approvedStores }],
         [{ totalUsers }],
         [{ totalSellers }],
+        [{ totalStoreAdmins }],
+        [{ totalPlatformAdmins }],
         [{ totalProducts }],
         [{ totalOrders }],
         [{ revenue }],
@@ -29,6 +31,8 @@ export class AdminController extends BaseController {
         db.select({ approvedStores: count() }).from(stores).where(eq(stores.status, 'APPROVED')),
         db.select({ totalUsers: count() }).from(users),
         db.select({ totalSellers: count() }).from(users).where(eq(users.role, 'SELLER')),
+        db.select({ totalStoreAdmins: count() }).from(users).where(eq(users.role, 'STORE_ADMIN')),
+        db.select({ totalPlatformAdmins: count() }).from(users).where(eq(users.role, 'PLATFORM_ADMIN')),
         db.select({ totalProducts: count() }).from(products),
         db.select({ totalOrders: count() }).from(orders),
         db
@@ -46,6 +50,8 @@ export class AdminController extends BaseController {
         users: {
           total: Number(totalUsers),
           sellers: Number(totalSellers),
+          storeAdmins: Number(totalStoreAdmins),
+          platformAdmins: Number(totalPlatformAdmins),
         },
         products: Number(totalProducts),
         orders: Number(totalOrders),

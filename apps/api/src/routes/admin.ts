@@ -10,7 +10,7 @@ const adminRouter = new Hono()
 adminRouter.use(authenticate)
 adminRouter.use(async (c, next) => {
   const user = c.get('user')
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'PLATFORM_ADMIN') {
     throw new HTTPException(403, { message: 'Admin access required' })
   }
   await next()

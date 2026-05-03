@@ -9,8 +9,9 @@ export interface AuthServiceResponse<T> {
 }
 
 const ROLE_REDIRECT: Record<UserRole, string> = {
-  ADMIN: APP_ROUTES.admin.index,
+  PLATFORM_ADMIN: APP_ROUTES.admin.index,
   SELLER: APP_ROUTES.seller.index,
+  STORE_ADMIN: APP_ROUTES.dashboard.index,
   BUYER: APP_ROUTES.dashboard.index,
 };
 

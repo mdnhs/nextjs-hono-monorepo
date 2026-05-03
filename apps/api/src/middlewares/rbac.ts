@@ -116,7 +116,7 @@ export const requirePermission = (...permissions: Permission[]) =>
 // Verifies the authenticated user is OWNER or STAFF of the store.
 export const requireStoreAccess = async (c: Context, next: Next) => {
   const user = c.get('user')
-  if (user.role === 'ADMIN') return next()
+  if (user.role === 'PLATFORM_ADMIN') return next()
 
   const storeId = c.req.param('storeId') ?? c.req.param('id')
   if (!storeId) throw new HTTPException(400, { message: 'Store ID required' })
@@ -151,7 +151,7 @@ export const requireStoreOwnership = requireStoreAccess
 // ADMIN bypasses this check.
 export const requireProductOwnership = async (c: Context, next: Next) => {
   const user = c.get('user')
-  if (user.role === 'ADMIN') return next()
+  if (user.role === 'PLATFORM_ADMIN') return next()
 
   const productId = c.req.param('id')
   if (!productId) throw new HTTPException(400, { message: 'Product ID required' })
@@ -179,7 +179,7 @@ export const requireProductOwnership = async (c: Context, next: Next) => {
 // ADMIN bypasses this check.
 export const requireOrderOwnership = async (c: Context, next: Next) => {
   const user = c.get('user')
-  if (user.role === 'ADMIN') return next()
+  if (user.role === 'PLATFORM_ADMIN') return next()
 
   const orderId = c.req.param('id')
   if (!orderId) throw new HTTPException(400, { message: 'Order ID required' })
@@ -210,7 +210,7 @@ export const requireOrderOwnership = async (c: Context, next: Next) => {
 // ADMIN bypasses this check.
 export const requireReviewOwnership = async (c: Context, next: Next) => {
   const user = c.get('user')
-  if (user.role === 'ADMIN') return next()
+  if (user.role === 'PLATFORM_ADMIN') return next()
 
   const reviewId = c.req.param('id')
   if (!reviewId) throw new HTTPException(400, { message: 'Review ID required' })

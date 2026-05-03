@@ -4,6 +4,7 @@ import type { UserRole } from '../db/schema'
 import { eq, and, or, gte, lte, ilike, desc, count, avg, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
 import { toCents, centsToNumericString } from '../utils/money'
+import { revalidateNext, tagFor } from '../utils/revalidate'
 
 export interface CreateProductData {
   name: string
@@ -279,7 +280,7 @@ export class ProductService extends BaseService {
       throw new Error('Store not found')
     }
 
-    if (store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to add products to this store')
     }
 
@@ -325,6 +326,7 @@ export class ProductService extends BaseService {
       return created
     })
 
+    await revalidateNext([tagFor.products(storeId)])
     return this.getProductById(product.id)
   }
 
@@ -338,7 +340,7 @@ export class ProductService extends BaseService {
       throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (product.store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to update this product')
     }
 
@@ -382,6 +384,7 @@ export class ProductService extends BaseService {
       }
     })
 
+    await revalidateNext([tagFor.products(product.storeId)])
     return this.getProductById(id)
   }
 
@@ -395,12 +398,13 @@ export class ProductService extends BaseService {
       throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (product.store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to delete this product')
     }
 
     await db.delete(products).where(eq(products.id, id))
 
+    await revalidateNext([tagFor.products(product.storeId)])
     return { message: 'Product deleted successfully' }
   }
 
@@ -414,7 +418,7 @@ export class ProductService extends BaseService {
       throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (product.store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to update inventory')
     }
 
@@ -443,7 +447,7 @@ export class ProductService extends BaseService {
       throw new Error('Product not found')
     }
 
-    if (product.store.ownerId !== userId && userRole !== 'ADMIN') {
+    if (product.store.ownerId !== userId && userRole !== 'PLATFORM_ADMIN') {
       throw new Error('Not authorized to update product status')
     }
 

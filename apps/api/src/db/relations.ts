@@ -25,6 +25,10 @@ import {
   discounts,
   taxRates,
   shippingRates,
+  themes,
+  themeSections,
+  themeBlocks,
+  domainVerifications,
 } from './schema'
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -35,8 +39,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   reviewHelpfulVotes: many(reviewHelpfuls),
 }))
 
-export const customersRelations = relations(customers, ({ one }) => ({
+export const customersRelations = relations(customers, ({ one, many }) => ({
   store: one(stores, { fields: [customers.storeId], references: [stores.id] }),
+  carts: many(carts),
+  orders: many(orders),
 }))
 
 export const plansRelations = relations(plans, ({ many }) => ({
@@ -116,6 +122,8 @@ export const productVariantsRelations = relations(productVariants, ({ one, many 
 }))
 
 export const cartsRelations = relations(carts, ({ one, many }) => ({
+  store: one(stores, { fields: [carts.storeId], references: [stores.id] }),
+  customer: one(customers, { fields: [carts.customerId], references: [customers.id] }),
   user: one(users, { fields: [carts.userId], references: [users.id] }),
   items: many(cartItems),
 }))
@@ -128,6 +136,7 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   user: one(users, { fields: [orders.userId], references: [users.id] }),
+  customer: one(customers, { fields: [orders.customerId], references: [customers.id] }),
   store: one(stores, { fields: [orders.storeId], references: [stores.id] }),
   items: many(orderItems),
   shippingAddress: one(shippingAddresses, {
@@ -177,4 +186,22 @@ export const reviewsRelations = relations(reviews, ({ one, many }) => ({
 export const reviewHelpfulsRelations = relations(reviewHelpfuls, ({ one }) => ({
   user: one(users, { fields: [reviewHelpfuls.userId], references: [users.id] }),
   review: one(reviews, { fields: [reviewHelpfuls.reviewId], references: [reviews.id] }),
+}))
+
+export const themesRelations = relations(themes, ({ one, many }) => ({
+  store: one(stores, { fields: [themes.storeId], references: [stores.id] }),
+  sections: many(themeSections),
+}))
+
+export const themeSectionsRelations = relations(themeSections, ({ one, many }) => ({
+  theme: one(themes, { fields: [themeSections.themeId], references: [themes.id] }),
+  blocks: many(themeBlocks),
+}))
+
+export const themeBlocksRelations = relations(themeBlocks, ({ one }) => ({
+  section: one(themeSections, { fields: [themeBlocks.sectionId], references: [themeSections.id] }),
+}))
+
+export const domainVerificationsRelations = relations(domainVerifications, ({ one }) => ({
+  store: one(stores, { fields: [domainVerifications.storeId], references: [stores.id] }),
 }))

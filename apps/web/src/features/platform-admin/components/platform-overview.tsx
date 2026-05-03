@@ -154,7 +154,7 @@ export const PlatformOverview = () => {
         <StatCard
           title="Total Users"
           value={d?.users.total ?? 0}
-          sub={`${d?.users.sellers ?? 0} sellers`}
+          sub={`${d?.users.sellers ?? 0} Sellers · ${d?.users.storeAdmins ?? 0} Staff`}
           icon={Users}
           href="/admin/users"
           borderColor="border-l-violet-500"

@@ -51,7 +51,7 @@ export class ProductController extends BaseController {
       const product = await productService.getProductById(id)
       
       // If store is not approved, only ADMIN or store OWNER can view its products
-      if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
+      if (product.store.status !== 'APPROVED' && user?.role !== 'PLATFORM_ADMIN' && product.store.ownerId !== user?.userId) {
         return c.json({
           data: null,
           error: true,
@@ -72,7 +72,7 @@ export class ProductController extends BaseController {
       const product = await productService.getProductBySku(sku)
       
       // If store is not approved, only ADMIN or store OWNER can view its products
-      if (product.store.status !== 'APPROVED' && user?.role !== 'ADMIN' && product.store.ownerId !== user?.userId) {
+      if (product.store.status !== 'APPROVED' && user?.role !== 'PLATFORM_ADMIN' && product.store.ownerId !== user?.userId) {
         return c.json({
           data: null,
           error: true,
@@ -94,7 +94,7 @@ export class ProductController extends BaseController {
       const store = await storeService.getStoreById(storeId)
 
       // If store is not approved, only ADMIN or store OWNER can view its products
-      if (store.status !== 'APPROVED' && user?.role !== 'ADMIN' && store.ownerId !== user?.userId) {
+      if (store.status !== 'APPROVED' && user?.role !== 'PLATFORM_ADMIN' && store.ownerId !== user?.userId) {
         return c.json({
           data: null,
           error: true,

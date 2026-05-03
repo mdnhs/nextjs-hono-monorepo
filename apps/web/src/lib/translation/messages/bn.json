@@ -21,8 +21,10 @@
     "lastName": "শেষ নাম",
     "storeName": "স্টোরের নাম",
     "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
-    "roleAdmin": "অ্যাডমিন",
+    "rolePlatformAdmin": "প্ল্যাটফর্ম অ্যাডমিন",
     "roleSeller": "বিক্রেতা",
+    "roleStoreAdmin": "স্টোর স্টাফ",
+    "roleBuyer": "ক্রেতা",
     "noAccount": "অ্যাকাউন্ট নেই?",
     "alreadyHaveAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?"
   },

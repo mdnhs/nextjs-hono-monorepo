@@ -9,8 +9,9 @@ datasource db {
 
 enum UserRole {
   BUYER
+  STORE_ADMIN
   SELLER
-  ADMIN
+  PLATFORM_ADMIN
 }
 
 enum StoreStatus {

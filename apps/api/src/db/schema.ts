@@ -15,7 +15,7 @@ import {
 import { sql } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 
-export const userRoleEnum = pgEnum('UserRole', ['BUYER', 'SELLER', 'ADMIN'])
+export const userRoleEnum = pgEnum('UserRole', ['BUYER', 'STORE_ADMIN', 'SELLER', 'PLATFORM_ADMIN'])
 export const storeStatusEnum = pgEnum('StoreStatus', ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'])
 export const orderStatusEnum = pgEnum('OrderStatus', ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'])
 export const billingCycleEnum = pgEnum('BillingCycle', ['MONTHLY', 'YEARLY'])
@@ -322,13 +322,22 @@ export const productVariants = pgTable('ProductVariant', {
 
 export const carts = pgTable('Cart', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  userId: text('userId')
-    .unique()
+  storeId: text('storeId')
     .notNull()
-    .references(() => users.id),
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  customerId: text('customerId').references(() => customers.id, { onDelete: 'cascade' }),
+  cartToken: text('cartToken').unique(),
+  // Legacy: pre-multi-tenant cart bound to platform User. Nullable now; remove once data migrated.
+  userId: text('userId').references(() => users.id),
+  expiresAt: timestamp('expiresAt'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
-})
+}, (t) => [
+  uniqueIndex('Cart_storeId_customerId_uq').on(t.storeId, t.customerId),
+  index('Cart_storeId_idx').on(t.storeId),
+  index('Cart_customerId_idx').on(t.customerId),
+  index('Cart_cartToken_idx').on(t.cartToken),
+])
 
 export const cartItems = pgTable('CartItem', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
@@ -344,7 +353,8 @@ export const cartItems = pgTable('CartItem', {
   // Variant the customer chose. Nullable for backward compat — defaults resolve to product's default variant at read time.
   variantId: text('variantId').references(() => productVariants.id),
 }, (t) => [
-  uniqueIndex('CartItem_cartId_productId_key').on(t.cartId, t.productId),
+  // Same product can appear with different variants; uniqueness is per (cart, variant).
+  uniqueIndex('CartItem_cartId_variantId_key').on(t.cartId, t.variantId),
   index('CartItem_cartId_idx').on(t.cartId),
   index('CartItem_productId_idx').on(t.productId),
   index('CartItem_variantId_idx').on(t.variantId),
@@ -364,14 +374,18 @@ export const orders = pgTable('Order', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
   deletedAt: timestamp('deletedAt'),
-  userId: text('userId')
-    .notNull()
-    .references(() => users.id),
+  // Legacy: order placed by a platform User (seller test orders, internal). Now nullable.
+  userId: text('userId').references(() => users.id),
+  customerId: text('customerId').references(() => customers.id),
+  // Snapshot of guest contact when no customer record exists yet.
+  guestEmail: text('guestEmail'),
+  guestName: text('guestName'),
   storeId: text('storeId')
     .notNull()
     .references(() => stores.id),
 }, (t) => [
   index('Order_userId_idx').on(t.userId),
+  index('Order_customerId_idx').on(t.customerId),
   index('Order_storeId_idx').on(t.storeId),
   index('Order_status_idx').on(t.status),
 ])
@@ -554,6 +568,49 @@ export const storeStaffs = pgTable('StoreStaff', {
   index('StoreStaff_userId_idx').on(t.userId),
 ])
 
+// Page-level theme content. Each store has many themes; only one is `isPublished`.
+// Theme = ordered list of Sections, Section = ordered list of Blocks. Both carry JSON settings.
+export const themes = pgTable('Theme', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  isPublished: boolean('isPublished').notNull().default(false),
+  // Theme-wide settings (palette overrides, layout flags). Section/block configs live in their own rows.
+  settings: jsonb('settings').notNull().default({}),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('Theme_storeId_idx').on(t.storeId),
+  index('Theme_isPublished_idx').on(t.isPublished),
+])
+
+export const themeSections = pgTable('ThemeSection', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  themeId: text('themeId').notNull().references(() => themes.id, { onDelete: 'cascade' }),
+  // Free-form handle that maps to a frontend component, e.g. 'hero', 'product_grid', 'rich_text'.
+  type: text('type').notNull(),
+  settings: jsonb('settings').notNull().default({}),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('ThemeSection_themeId_idx').on(t.themeId),
+  index('ThemeSection_position_idx').on(t.themeId, t.position),
+])
+
+export const themeBlocks = pgTable('ThemeBlock', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  sectionId: text('sectionId').notNull().references(() => themeSections.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // e.g. 'heading', 'button', 'image', 'rich_text'
+  settings: jsonb('settings').notNull().default({}),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('ThemeBlock_sectionId_idx').on(t.sectionId),
+  index('ThemeBlock_position_idx').on(t.sectionId, t.position),
+])
+
 export const themeSettings = pgTable('ThemeSetting', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
   storeId: text('storeId').unique().notNull().references(() => stores.id, { onDelete: 'cascade' }),
@@ -601,6 +658,34 @@ export const navigationItems = pgTable('NavigationItem', {
   updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
 }, (t) => [
   index('NavigationItem_navigationId_idx').on(t.navigationId),
+])
+
+export const domainVerificationStatusEnum = pgEnum('DomainVerificationStatus', [
+  'PENDING',
+  'VERIFIED',
+  'FAILED',
+])
+export type DomainVerificationStatus = (typeof domainVerificationStatusEnum.enumValues)[number]
+
+// Tracks the seller's claim on a custom domain. Status flips to VERIFIED only when DNS TXT
+// at `_saas-verify.<hostname>` matches our token. Once verified we set Store.customDomain.
+export const domainVerifications = pgTable('DomainVerification', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  hostname: text('hostname').notNull(),
+  // High-entropy random token. Sellers paste this verbatim into their TXT record.
+  txtToken: text('txtToken').notNull(),
+  status: domainVerificationStatusEnum('status').notNull().default('PENDING'),
+  attempts: integer('attempts').notNull().default(0),
+  lastCheckedAt: timestamp('lastCheckedAt'),
+  verifiedAt: timestamp('verifiedAt'),
+  failureReason: text('failureReason'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  uniqueIndex('DomainVerification_hostname_uq').on(t.hostname),
+  index('DomainVerification_storeId_idx').on(t.storeId),
+  index('DomainVerification_status_idx').on(t.status),
 ])
 
 export const assets = pgTable('Asset', {

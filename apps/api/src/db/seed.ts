@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { db } from './index'
-import { categories, plans, users, stores, subscriptions, products } from './schema'
+import { categories, plans, users, stores, subscriptions, products, storeStaffs } from './schema'
 import { eq } from 'drizzle-orm'
 import { hashPassword } from '../utils/auth'
 
@@ -25,7 +25,10 @@ async function upsertPlan(data: any) {
 async function upsertUser(data: any) {
   const existing = await db.query.users.findFirst({ where: eq(users.email, data.email) })
   if (existing) return existing
-  const [row] = await db.insert(users).values(data).returning()
+  const [row] = await db.insert(users).values({
+    ...data,
+    updatedAt: new Date(),
+  }).returning()
   return row
 }
 
@@ -56,7 +59,7 @@ async function main() {
     email: 'admin@example.com',
     password: await hashPassword('admin123'),
     name: 'Platform Admin',
-    role: 'ADMIN' as const,
+    role: 'PLATFORM_ADMIN' as const,
   })
 
   const seller = await upsertUser({
@@ -64,6 +67,13 @@ async function main() {
     password: await hashPassword('seller123'),
     name: 'Test Seller',
     role: 'SELLER' as const,
+  })
+
+  const staff = await upsertUser({
+    email: 'staff@example.com',
+    password: await hashPassword('staff123'),
+    name: 'Test Staff',
+    role: 'STORE_ADMIN' as const,
   })
 
   console.log('✅ Created users')
@@ -78,6 +88,13 @@ async function main() {
       status: 'APPROVED',
     }).returning()
     store = s
+
+    // Link staff to store
+    await db.insert(storeStaffs).values({
+      storeId: store.id,
+      userId: staff.id,
+      role: 'MANAGER',
+    })
   }
 
   console.log('✅ Created store:', store.name)
@@ -128,6 +145,7 @@ async function main() {
   console.log('\n📝 Test accounts:')
   console.log('  Admin:  admin@example.com / admin123')
   console.log('  Seller: seller@example.com / seller123')
+  console.log('  Staff:  staff@example.com / staff123')
   console.log('  Buyer:  buyer@example.com / buyer123')
 }
 

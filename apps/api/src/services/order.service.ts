@@ -1,10 +1,23 @@
 import { db } from '../db'
-import { orders, orderItems, products, stores, shippingAddresses } from '../db/schema'
+import {
+  orders,
+  orderItems,
+  stores,
+  shippingAddresses,
+  customers,
+  locations,
+  inventoryLevels,
+  inventoryTransactions,
+} from '../db/schema'
 import type { OrderStatus } from '../db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
 import { cartService } from './cart.service'
 import { emitWebhook, WEBHOOK_TOPICS } from './webhook.service'
+import { inventoryService } from './inventory.service'
+import { calculationService } from './calculation.service'
+import { centsToNumericString } from '../utils/money'
+import type { CartIdentity } from '../middlewares/storefront'
 
 export interface ShippingAddressData {
   street: string
@@ -17,113 +30,143 @@ export interface ShippingAddressData {
 
 export interface CreateOrderData {
   shippingAddress: ShippingAddressData
+  discountCode?: string
+  locationId?: string
+  // Required for guest checkout when identity has no customerId.
+  guestEmail?: string
+  guestName?: string
+  guestPhone?: string
 }
 
 export interface OrderFilters {
   userId?: string
+  customerId?: string
   storeId?: string
   status?: OrderStatus
   storeOwnerId?: string
 }
 
-import { inventoryService } from './inventory.service'
-import { calculationService } from './calculation.service'
-import { toCents, centsToNumericString } from '../utils/money'
-import { locations } from '../db/schema'
-
 export class OrderService extends BaseService {
-  async createOrder(userId: string, data: CreateOrderData & { discountCode?: string; locationId?: string }) {
-    const cart = await cartService.getOrCreateCart(userId)
+  // Storefront checkout. Identity is either a logged-in customer or a guest cart token.
+  async createOrderFromCart(identity: CartIdentity, data: CreateOrderData) {
+    const cart = await cartService.findByIdentity(identity)
+    if (!cart || cart.items.length === 0) throw new Error('Cart is empty')
 
-    if (cart.items.length === 0) {
-      throw new Error('Cart is empty')
-    }
-
-    // Default to the store's default location if not provided
-    let locationId = data.locationId
-
-    const storeOrders = new Map<string, any[]>()
-
-    for (const item of cart.items) {
-      const storeId = item.product.store.id
-      if (!storeOrders.has(storeId)) {
-        storeOrders.set(storeId, [])
-      }
-      storeOrders.get(storeId)!.push(item)
-    }
-
-    const createdOrders = []
-
-    for (const [storeId, items] of storeOrders) {
-      // 1. Resolve Location
-      if (!locationId) {
-        const defaultLoc = await db.query.locations.findFirst({
-          where: and(eq(locations.storeId, storeId), eq(locations.isDefault, true))
-        })
-        if (!defaultLoc) throw new Error(`No default location found for store ${storeId}`)
-        locationId = defaultLoc.id
-      }
-
-      // 2. Calculate Totals
-      const calcResult = await calculationService.calculate(storeId, {
-        items: items.map(i => ({
-          priceCents: i.product.priceCents,
-          quantity: i.quantity,
-          productId: i.product.id
-        })),
-        discountCode: data.discountCode
+    // Resolve customer: existing, or auto-create from guest email.
+    let customerId = identity.customerId
+    if (!customerId) {
+      if (!data.guestEmail) throw new Error('Guest email required for checkout')
+      const existing = await db.query.customers.findFirst({
+        where: and(eq(customers.storeId, identity.storeId), eq(customers.email, data.guestEmail)),
       })
-
-      const order = await db.transaction(async (tx) => {
-        // 3. Reserve Inventory
-        for (const item of items) {
-          await inventoryService.reserve({
-            variantId: item.variantId ?? 'default', // Fallback for legacy
-            locationId: locationId!,
-            quantity: item.quantity,
-            reason: 'Order Created',
-          })
-        }
-
-        // 4. Create Order record
-        const [createdOrder] = await tx
-          .insert(orders)
+      if (existing) {
+        customerId = existing.id
+      } else {
+        const [created] = await db
+          .insert(customers)
           .values({
-            userId,
-            storeId,
-            total: centsToNumericString(calcResult.totalCents),
-            totalCents: calcResult.totalCents,
-            currency: items[0].product.currency ?? 'USD',
-            status: 'PENDING',
+            storeId: identity.storeId,
+            email: data.guestEmail,
+            name: data.guestName ?? null,
+            phone: data.guestPhone ?? null,
           })
           .returning()
-
-        await tx.insert(orderItems).values(
-          items.map((item: any) => ({
-            orderId: createdOrder.id,
-            productId: item.product.id,
-            variantId: item.variantId,
-            quantity: item.quantity,
-            price: item.product.price,
-            priceCents: item.product.priceCents,
-            currency: item.product.currency,
-          }))
-        )
-
-        await tx.insert(shippingAddresses).values({
-          orderId: createdOrder.id,
-          ...data.shippingAddress,
-        })
-
-        return this.getOrderWithDetails(tx, createdOrder.id)
-      })
-
-      createdOrders.push(order)
+        customerId = created.id
+      }
     }
 
-    await cartService.clearCart(userId)
+    // Resolve location.
+    let locationId = data.locationId
+    if (!locationId) {
+      const def = await db.query.locations.findFirst({
+        where: and(eq(locations.storeId, identity.storeId), eq(locations.isDefault, true)),
+      })
+      if (!def) throw new Error('No default location for store')
+      locationId = def.id
+    }
 
-    return createdOrders
+    // Validate variants and build calc input.
+    const calcItems = cart.items.map((it: any) => {
+      if (!it.variantId) throw new Error(`Cart item ${it.id} has no variant`)
+      if (!it.variant) throw new Error('Variant missing')
+      return {
+        priceCents: it.variant.priceCents as bigint,
+        quantity: it.quantity,
+        productId: it.productId,
+      }
+    })
+
+    const calc = await calculationService.calculate(identity.storeId, {
+      items: calcItems,
+      discountCode: data.discountCode,
+    })
+
+    const currency = (cart.items[0] as any).variant?.currency ?? 'USD'
+
+    const order = await db.transaction(async (tx) => {
+      // Reserve inventory atomically. inventoryService.reserve uses its own tx — we run sequentially before opening order tx.
+      // Note: this gives us correctness (no oversell) at cost of two-phase work; refactor inventoryService to accept a tx if you need full atomicity.
+
+      const [createdOrder] = await tx
+        .insert(orders)
+        .values({
+          customerId,
+          storeId: identity.storeId,
+          guestEmail: identity.customerId ? null : data.guestEmail ?? null,
+          guestName: identity.customerId ? null : data.guestName ?? null,
+          total: centsToNumericString(calc.totalCents),
+          totalCents: calc.totalCents,
+          currency,
+          status: 'PENDING',
+        })
+        .returning()
+
+      await tx.insert(orderItems).values(
+        cart.items.map((it: any) => ({
+          orderId: createdOrder.id,
+          productId: it.productId,
+          variantId: it.variantId,
+          quantity: it.quantity,
+          price: centsToNumericString(it.variant.priceCents as bigint),
+          priceCents: it.variant.priceCents as bigint,
+          currency: it.variant.currency,
+        }))
+      )
+
+      await tx.insert(shippingAddresses).values({
+        orderId: createdOrder.id,
+        ...data.shippingAddress,
+      })
+
+      return createdOrder
+    })
+
+    // Reserve inventory after order row exists so referenceId is set. Failures here cancel the order.
+    try {
+      for (const it of cart.items) {
+        await inventoryService.reserve({
+          variantId: it.variantId!,
+          locationId,
+          quantity: it.quantity,
+          reason: 'Order Created',
+          referenceId: order.id,
+          referenceType: 'ORDER',
+        })
+      }
+    } catch (err) {
+      await db.update(orders).set({ status: 'CANCELLED' }).where(eq(orders.id, order.id))
+      throw err
+    }
+
+    await cartService.clearCart(identity)
+
+    await emitWebhook(identity.storeId, WEBHOOK_TOPICS.ORDER_CREATED, {
+      orderId: order.id,
+      totalCents: calc.totalCents.toString(),
+      currency,
+    })
+
+    return this.getOrderById(order.id)
   }
 
   async getOrders(filters: OrderFilters, pagination: { page: number; limit: number }) {
@@ -131,23 +174,22 @@ export class OrderService extends BaseService {
 
     const conditions: any[] = []
     if (filters.userId) conditions.push(eq(orders.userId, filters.userId))
+    if (filters.customerId) conditions.push(eq(orders.customerId, filters.customerId))
     if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId))
     if (filters.status) conditions.push(eq(orders.status, filters.status))
 
     if (filters.storeOwnerId) {
-      // Join with stores to filter by store owner
       const ownerStores = await db.query.stores.findMany({
         where: eq(stores.ownerId, filters.storeOwnerId),
         columns: { id: true },
       })
       const storeIds = ownerStores.map((s) => s.id)
-      if (storeIds.length > 0) {
-        conditions.push(
-          sql`${orders.storeId} IN (${sql.join(storeIds.map((id) => sql`${id}`), sql`, `)})`
-        )
-      } else {
+      if (storeIds.length === 0) {
         return this.formatPaginatedResult([], 0, page, limit)
       }
+      conditions.push(
+        sql`${orders.storeId} IN (${sql.join(storeIds.map((id) => sql`${id}`), sql`, `)})`
+      )
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined
@@ -162,10 +204,12 @@ export class OrderService extends BaseService {
           items: {
             with: {
               product: { columns: { id: true, name: true, images: true, sku: true } },
+              variant: true,
             },
           },
           shippingAddress: true,
           store: { columns: { id: true, name: true, slug: true } },
+          customer: { columns: { id: true, name: true, email: true } },
           user: { columns: { id: true, name: true, email: true } },
         },
       }),
@@ -175,13 +219,14 @@ export class OrderService extends BaseService {
     return this.formatPaginatedResult(rows, Number(total), page, limit)
   }
 
-  async getOrderById(orderId: string, userId: string) {
+  async getOrderById(orderId: string, requesterUserId?: string, requesterCustomerId?: string) {
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
       with: {
         items: {
           with: {
             product: { columns: { id: true, name: true, images: true, sku: true, description: true } },
+            variant: true,
           },
         },
         shippingAddress: true,
@@ -189,34 +234,34 @@ export class OrderService extends BaseService {
           columns: { id: true, name: true, slug: true },
           with: { owner: { columns: { id: true, name: true, email: true } } },
         },
+        customer: { columns: { id: true, name: true, email: true } },
         user: { columns: { id: true, name: true, email: true } },
       },
     })
 
-    if (!order) {
-      throw new Error('Order not found')
-    }
+    if (!order) throw new Error('Order not found')
 
-    if (order.userId !== userId && order.store.owner.id !== userId) {
-      throw new Error('Not authorized to view this order')
+    // Authorization: explicit requester scoping. Skip when neither id given (admin paths).
+    if (requesterUserId !== undefined || requesterCustomerId !== undefined) {
+      const isOwner = order.store.owner.id === requesterUserId
+      const isPlacingUser = requesterUserId && order.userId === requesterUserId
+      const isCustomer = requesterCustomerId && order.customerId === requesterCustomerId
+      if (!isOwner && !isPlacingUser && !isCustomer) {
+        throw new Error('Not authorized to view this order')
+      }
     }
 
     return order
   }
 
-  async updateOrderStatus(orderId: string, status: OrderStatus, userId: string) {
+  async updateOrderStatus(orderId: string, status: OrderStatus, requesterUserId: string) {
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
       with: { store: { columns: { ownerId: true } } },
     })
 
-    if (!order) {
-      throw new Error('Order not found')
-    }
-
-    if (order.store.ownerId !== userId) {
-      throw new Error('Not authorized to update this order')
-    }
+    if (!order) throw new Error('Order not found')
+    if (order.store.ownerId !== requesterUserId) throw new Error('Not authorized to update this order')
 
     const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
       PENDING: ['PROCESSING', 'CANCELLED'],
@@ -232,23 +277,49 @@ export class OrderService extends BaseService {
     }
 
     if (status === 'CANCELLED' || status === 'REFUNDED') {
-      const items = await db.query.orderItems.findMany({ where: eq(orderItems.orderId, orderId) })
-
-      await db.transaction(async (tx) => {
-        for (const item of items) {
-          await tx
-            .update(products)
-            .set({ quantity: sql`${products.quantity} + ${item.quantity}` })
-            .where(eq(products.id, item.productId))
-        }
-
-        await tx.update(orders).set({ status }).where(eq(orders.id, orderId))
-      })
-    } else {
-      await db.update(orders).set({ status }).where(eq(orders.id, orderId))
+      await this.releaseReservedInventory(orderId)
     }
 
-    return this.getOrderById(orderId, userId)
+    await db.update(orders).set({ status }).where(eq(orders.id, orderId))
+    return this.getOrderById(orderId)
+  }
+
+  // Release reservations for every line item on the order.
+  // Inventory: move quantity from reserved → available.
+  private async releaseReservedInventory(orderId: string) {
+    const items = await db.query.orderItems.findMany({ where: eq(orderItems.orderId, orderId) })
+
+    await db.transaction(async (tx) => {
+      for (const item of items) {
+        if (!item.variantId) continue
+        const levels = await tx.query.inventoryLevels.findMany({
+          where: eq(inventoryLevels.variantId, item.variantId),
+        })
+        // Walk locations and release until quota satisfied. Simple greedy strategy.
+        let remaining = item.quantity
+        for (const level of levels) {
+          if (remaining <= 0) break
+          const take = Math.min(level.reserved, remaining)
+          if (take === 0) continue
+          await tx
+            .update(inventoryLevels)
+            .set({
+              reserved: sql`${inventoryLevels.reserved} - ${take}`,
+              available: sql`${inventoryLevels.available} + ${take}`,
+            })
+            .where(eq(inventoryLevels.id, level.id))
+          await tx.insert(inventoryTransactions).values({
+            inventoryLevelId: level.id,
+            type: 'RETURN',
+            quantity: take,
+            reason: 'Order Cancelled / Refunded',
+            referenceId: orderId,
+            referenceType: 'ORDER',
+          })
+          remaining -= take
+        }
+      }
+    })
   }
 
   async getSellerOrders(
@@ -259,33 +330,11 @@ export class OrderService extends BaseService {
     return this.getOrders({ ...filters, storeOwnerId: ownerId }, pagination)
   }
 
-  async getStoreOrders(storeId: string, userId: string, pagination: { page: number; limit: number }) {
+  async getStoreOrders(storeId: string, requesterUserId: string, pagination: { page: number; limit: number }) {
     const store = await db.query.stores.findFirst({ where: eq(stores.id, storeId) })
-
-    if (!store) {
-      throw new Error('Store not found')
-    }
-
-    if (store.ownerId !== userId) {
-      throw new Error('Not authorized to view store orders')
-    }
-
+    if (!store) throw new Error('Store not found')
+    if (store.ownerId !== requesterUserId) throw new Error('Not authorized to view store orders')
     return this.getOrders({ storeId }, pagination)
-  }
-
-  private async getOrderWithDetails(tx: any, orderId: string) {
-    return tx.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      with: {
-        items: {
-          with: {
-            product: { columns: { id: true, name: true, images: true, sku: true } },
-          },
-        },
-        shippingAddress: true,
-        store: { columns: { id: true, name: true, slug: true } },
-      },
-    })
   }
 }
 

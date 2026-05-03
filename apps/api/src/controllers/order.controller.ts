@@ -1,41 +1,14 @@
 import { Context } from "hono";
 import { BaseController } from "./base.controller";
-import { orderService, CreateOrderData } from "../services/order.service";
+import { orderService } from "../services/order.service";
 import type { OrderStatus } from "../db/schema";
 import { z } from "zod";
-
-const createOrderSchema = z.object({
-  shippingAddress: z.object({
-    street: z.string().min(1),
-    city: z.string().min(1),
-    state: z.string().min(1),
-    postalCode: z.string().min(1),
-    country: z.string().min(1),
-    phone: z.string().min(1),
-  }),
-});
 
 const updateOrderStatusSchema = z.object({
   status: z.enum(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
 });
 
 export class OrderController extends BaseController {
-  async createOrder(c: Context) {
-    try {
-      const user = c.get("user");
-      const validatedData = await this.parseBody<CreateOrderData>(
-        c,
-        createOrderSchema
-      );
-
-      const orders = await orderService.createOrder(user.userId, validatedData);
-
-      return this.success(c, orders, 'Order(s) created successfully', 201);
-    } catch (error: any) {
-      return this.handleError(error);
-    }
-  }
-
   async getOrders(c: Context) {
     try {
       const user = c.get("user");
@@ -82,6 +55,7 @@ export class OrderController extends BaseController {
       const orderId = c.req.param("id")!;
 
       const order = await orderService.getOrderById(orderId, user.userId);
+      // requesterUserId already covers buyer-as-User and seller cases.
 
       return this.success(c, order);
     } catch (error: any) {

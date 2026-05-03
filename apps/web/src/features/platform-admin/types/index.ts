@@ -26,7 +26,7 @@ export interface PlatformUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'SELLER' | 'BUYER';
+  role: 'PLATFORM_ADMIN' | 'SELLER' | 'STORE_ADMIN' | 'BUYER';
   createdAt: string;
   _count?: { stores: number };
   stores?: { id: string }[];

@@ -50,7 +50,7 @@ export function AdminBreadcrumb() {
       <BreadcrumbList>
         <BreadcrumbItem className="hidden md:block">
           <BreadcrumbLink href="/admin" className="text-sm text-muted-foreground hover:text-foreground">
-            Admin
+            Platform
           </BreadcrumbLink>
         </BreadcrumbItem>
         {relevant.slice(1).map((seg, i, arr) => {

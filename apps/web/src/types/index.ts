@@ -21,7 +21,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'BUYER' | 'SELLER' | 'ADMIN';
+  role: 'BUYER' | 'STORE_ADMIN' | 'SELLER' | 'PLATFORM_ADMIN';
   createdAt: string;
   updatedAt: string;
 }

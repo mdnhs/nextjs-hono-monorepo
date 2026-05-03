@@ -7,8 +7,11 @@ dotenv.config()
 import { Worker, type Job } from 'bullmq'
 import { getRedis } from './connection'
 import { QUEUE_NAMES, type EmailJob, type WebhookJob, type SearchIndexJob } from './queues'
-import { deliverWebhook } from '../services/webhook.service'
+import { deliverWebhook, emitWebhook, WEBHOOK_TOPICS } from '../services/webhook.service'
 import { purgeExpiredIdempotencyKeys } from '../middlewares/idempotency'
+import { subscriptionService } from '../services/subscription.service'
+import { cartService } from '../services/cart.service'
+import { registerCronJobs } from './scheduler'
 
 const concurrency = parseInt(process.env.WORKER_CONCURRENCY ?? '10', 10)
 
@@ -67,15 +70,35 @@ const searchWorker = new Worker<SearchIndexJob>(
   { connection: getRedis(), concurrency },
 )
 
-// Cleanup worker — runs periodic maintenance. Schedule via repeatable jobs.
+// Cleanup worker — runs periodic maintenance. Schedule via repeatable jobs (see scheduler.ts).
 const cleanupWorker = new Worker(
   QUEUE_NAMES.CLEANUP,
   async (job: Job) => {
-    if (job.name === 'purge-idempotency') {
-      const removed = await purgeExpiredIdempotencyKeys()
-      return { removed }
+    switch (job.name) {
+      case 'purge-idempotency': {
+        const removed = await purgeExpiredIdempotencyKeys()
+        return { removed }
+      }
+      case 'expire-subscriptions': {
+        const { expiredStoreIds } = await subscriptionService.expireOverdueSubscriptions()
+        for (const storeId of expiredStoreIds) {
+          await emitWebhook(storeId, WEBHOOK_TOPICS.SUBSCRIPTION_EXPIRED, {
+            storeId,
+            expiredAt: new Date().toISOString(),
+          })
+        }
+        return { expired: expiredStoreIds.length }
+      }
+      case 'abandoned-carts': {
+        const carts = await cartService.findAbandonedCarts(24)
+        for (const c of carts) {
+          await emitWebhook(c.storeId, WEBHOOK_TOPICS.CART_ABANDONED, c)
+        }
+        return { count: carts.length }
+      }
+      default:
+        throw new Error(`Unknown cleanup job: ${job.name}`)
     }
-    throw new Error(`Unknown cleanup job: ${job.name}`)
   },
   { connection: getRedis(), concurrency: 1 },
 )
@@ -96,5 +119,10 @@ const shutdown = async (signal: string) => {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
+
+// Schedule cron jobs (idempotent: BullMQ deduplicates by repeat pattern + jobId).
+registerCronJobs().catch((err) => {
+  console.error('[worker] failed to register cron jobs', err)
+})
 
 console.log('[worker] started')
