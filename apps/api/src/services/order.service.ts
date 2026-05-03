@@ -4,6 +4,7 @@ import type { OrderStatus } from '../db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
 import { cartService } from './cart.service'
+import { emitWebhook, WEBHOOK_TOPICS } from './webhook.service'
 
 export interface ShippingAddressData {
   street: string

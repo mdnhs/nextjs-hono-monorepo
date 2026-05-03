@@ -1,8 +1,9 @@
 import { db } from '../db'
-import { products, stores, categories, reviews } from '../db/schema'
+import { products, productVariants, stores, categories, reviews } from '../db/schema'
 import type { UserRole } from '../db/schema'
 import { eq, and, or, gte, lte, ilike, desc, count, avg, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
+import { toCents, centsToNumericString } from '../utils/money'
 
 export interface CreateProductData {
   name: string
@@ -294,15 +295,35 @@ export class ProductService extends BaseService {
       }
     }
 
-    const [product] = await db
-      .insert(products)
-      .values({
-        ...data,
-        price: String(data.price),
-        storeId,
-        images: data.images || [],
+    const priceCents = toCents(data.price)
+    const currency = store.currency ?? 'USD'
+
+    const product = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(products)
+        .values({
+          ...data,
+          price: centsToNumericString(priceCents),
+          priceCents,
+          currency,
+          storeId,
+          images: data.images || [],
+        })
+        .returning()
+
+      await tx.insert(productVariants).values({
+        productId: created.id,
+        sku: data.sku,
+        priceCents,
+        currency,
+        price: centsToNumericString(priceCents),
+        quantity: data.quantity,
+        isDefault: true,
+        position: 0,
       })
-      .returning()
+
+      return created
+    })
 
     return this.getProductById(product.id)
   }
@@ -336,9 +357,30 @@ export class ProductService extends BaseService {
     }
 
     const updateData: Record<string, unknown> = { ...data }
-    if (data.price !== undefined) updateData.price = String(data.price)
+    let priceCents: bigint | undefined
+    if (data.price !== undefined) {
+      priceCents = toCents(data.price)
+      updateData.price = centsToNumericString(priceCents)
+      updateData.priceCents = priceCents
+    }
 
-    await db.update(products).set(updateData as any).where(eq(products.id, id))
+    await db.transaction(async (tx) => {
+      await tx.update(products).set(updateData as any).where(eq(products.id, id))
+
+      const variantPatch: Record<string, unknown> = {}
+      if (priceCents !== undefined) {
+        variantPatch.priceCents = priceCents
+        variantPatch.price = centsToNumericString(priceCents)
+      }
+      if (data.sku !== undefined) variantPatch.sku = data.sku
+      if (data.quantity !== undefined) variantPatch.quantity = data.quantity
+      if (Object.keys(variantPatch).length > 0) {
+        await tx
+          .update(productVariants)
+          .set(variantPatch)
+          .where(and(eq(productVariants.productId, id), eq(productVariants.isDefault, true)))
+      }
+    })
 
     return this.getProductById(id)
   }
@@ -380,11 +422,13 @@ export class ProductService extends BaseService {
       throw new Error('Quantity cannot be negative')
     }
 
-    const [updated] = await db
-      .update(products)
-      .set({ quantity })
-      .where(eq(products.id, id))
-      .returning()
+    const [updated] = await db.transaction(async (tx) => {
+      await tx
+        .update(productVariants)
+        .set({ quantity })
+        .where(and(eq(productVariants.productId, id), eq(productVariants.isDefault, true)))
+      return tx.update(products).set({ quantity }).where(eq(products.id, id)).returning()
+    })
 
     return { ...updated, store: { id: product.store.id, name: product.store.name, slug: product.store.slug } }
   }

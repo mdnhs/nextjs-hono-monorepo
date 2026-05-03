@@ -1,8 +1,10 @@
 import { relations } from 'drizzle-orm'
 import {
   users,
+  customers,
   stores,
   products,
+  productVariants,
   categories,
   carts,
   cartItems,
@@ -13,6 +15,10 @@ import {
   reviewHelpfuls,
   plans,
   subscriptions,
+  payments,
+  refunds,
+  webhooks,
+  webhookDeliveries,
 } from './schema'
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -21,6 +27,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   cart: one(carts, { fields: [users.id], references: [carts.userId] }),
   reviews: many(reviews),
   reviewHelpfulVotes: many(reviewHelpfuls),
+}))
+
+export const customersRelations = relations(customers, ({ one }) => ({
+  store: one(stores, { fields: [customers.storeId], references: [stores.id] }),
 }))
 
 export const plansRelations = relations(plans, ({ many }) => ({
@@ -32,6 +42,7 @@ export const storesRelations = relations(stores, ({ one, many }) => ({
   products: many(products),
   orders: many(orders),
   subscriptions: many(subscriptions),
+  customers: many(customers),
 }))
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -52,9 +63,16 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
 export const productsRelations = relations(products, ({ one, many }) => ({
   store: one(stores, { fields: [products.storeId], references: [stores.id] }),
   category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
+  variants: many(productVariants),
   orderItems: many(orderItems),
   cartItems: many(cartItems),
   reviews: many(reviews),
+}))
+
+export const productVariantsRelations = relations(productVariants, ({ one, many }) => ({
+  product: one(products, { fields: [productVariants.productId], references: [products.id] }),
+  cartItems: many(cartItems),
+  orderItems: many(orderItems),
 }))
 
 export const cartsRelations = relations(carts, ({ one, many }) => ({
@@ -65,6 +83,7 @@ export const cartsRelations = relations(carts, ({ one, many }) => ({
 export const cartItemsRelations = relations(cartItems, ({ one }) => ({
   cart: one(carts, { fields: [cartItems.cartId], references: [carts.id] }),
   product: one(products, { fields: [cartItems.productId], references: [products.id] }),
+  variant: one(productVariants, { fields: [cartItems.variantId], references: [productVariants.id] }),
 }))
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
@@ -76,11 +95,32 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [shippingAddresses.orderId],
   }),
   reviews: many(reviews),
+  payments: many(payments),
+}))
+
+export const paymentsRelations = relations(payments, ({ one, many }) => ({
+  order: one(orders, { fields: [payments.orderId], references: [orders.id] }),
+  store: one(stores, { fields: [payments.storeId], references: [stores.id] }),
+  refunds: many(refunds),
+}))
+
+export const refundsRelations = relations(refunds, ({ one }) => ({
+  payment: one(payments, { fields: [refunds.paymentId], references: [payments.id] }),
+}))
+
+export const webhooksRelations = relations(webhooks, ({ one, many }) => ({
+  store: one(stores, { fields: [webhooks.storeId], references: [stores.id] }),
+  deliveries: many(webhookDeliveries),
+}))
+
+export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one }) => ({
+  webhook: one(webhooks, { fields: [webhookDeliveries.webhookId], references: [webhooks.id] }),
 }))
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   product: one(products, { fields: [orderItems.productId], references: [products.id] }),
+  variant: one(productVariants, { fields: [orderItems.variantId], references: [productVariants.id] }),
 }))
 
 export const shippingAddressesRelations = relations(shippingAddresses, ({ one }) => ({

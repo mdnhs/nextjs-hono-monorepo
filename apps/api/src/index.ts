@@ -16,6 +16,7 @@ import reviewsRouter from "./routes/reviews";
 import categoryRoutes from "./routes/category.routes";
 import planRouter from "./routes/plans";
 import adminRouter from "./routes/admin";
+import paymentsRouter from "./routes/payments";
 import swaggerRouter from "./routes/swagger";
 import { resolveTenant } from "./middlewares/tenant";
 
@@ -70,6 +71,8 @@ const PUBLIC_PREFIXES = [
   { method: "GET", path: "/api/v1/categories/" },
   { method: "GET", path: "/api/v1/reviews/product/" },
   { method: "GET", path: "/api/v1/plans/" },
+  // Payment webhooks: provider-signed, must bypass our JWT auth.
+  { method: "POST", path: "/api/v1/payments/webhooks/" },
 ];
 
 const PRIVATE_EXCEPTIONS = [
@@ -158,6 +161,7 @@ app.route("/api/v1/reviews", reviewsRouter);
 app.route("/api/v1/categories", categoryRoutes);
 app.route("/api/v1/plans", planRouter);
 app.route("/api/v1/admin", adminRouter);
+app.route("/api/v1/payments", paymentsRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

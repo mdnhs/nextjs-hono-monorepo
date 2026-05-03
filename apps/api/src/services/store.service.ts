@@ -3,6 +3,14 @@ import { stores, subscriptions, plans, products, orders, users } from '../db/sch
 import type { StoreStatus, UserRole } from '../db/schema'
 import { eq, and, ne, desc, count, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
+import { invalidateTenantCache } from '../middlewares/tenant'
+
+const cacheKeysFor = (s: { slug?: string | null; customDomain?: string | null }): string[] => {
+  const keys: string[] = []
+  if (s.slug) keys.push(`slug:${s.slug}`)
+  if (s.customDomain) keys.push(`host:${s.customDomain}`)
+  return keys
+}
 
 export interface CreateStoreData {
   name: string
@@ -316,6 +324,10 @@ export class StoreService extends BaseService {
 
     const [updated] = await db.update(stores).set(data as any).where(eq(stores.id, id)).returning()
 
+    // Invalidate tenant cache for old + new slug/domain
+    for (const key of cacheKeysFor(store)) invalidateTenantCache(key)
+    for (const key of cacheKeysFor(updated)) invalidateTenantCache(key)
+
     const owner = await db.query.users.findFirst({
       where: eq(users.id, updated.ownerId),
       columns: { id: true, name: true, email: true },
@@ -336,6 +348,7 @@ export class StoreService extends BaseService {
     }
 
     await db.delete(stores).where(eq(stores.id, id))
+    for (const key of cacheKeysFor(store)) invalidateTenantCache(key)
 
     return { message: 'Store deleted successfully' }
   }
@@ -356,6 +369,8 @@ export class StoreService extends BaseService {
       .set({ status: 'APPROVED' })
       .where(eq(stores.id, id))
       .returning()
+
+    for (const key of cacheKeysFor(updated)) invalidateTenantCache(key)
 
     const owner = await db.query.users.findFirst({
       where: eq(users.id, updated.ownerId),
@@ -378,6 +393,8 @@ export class StoreService extends BaseService {
       .where(eq(stores.id, id))
       .returning()
 
+    for (const key of cacheKeysFor(updated)) invalidateTenantCache(key)
+
     const owner = await db.query.users.findFirst({
       where: eq(users.id, updated.ownerId),
       columns: { id: true, name: true, email: true },
@@ -398,6 +415,8 @@ export class StoreService extends BaseService {
       .set({ status: 'SUSPENDED' })
       .where(eq(stores.id, id))
       .returning()
+
+    for (const key of cacheKeysFor(updated)) invalidateTenantCache(key)
 
     const owner = await db.query.users.findFirst({
       where: eq(users.id, updated.ownerId),
