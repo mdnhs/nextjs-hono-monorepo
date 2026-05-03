@@ -102,6 +102,9 @@ export class StoreController extends BaseController {
         ...validatedData,
         planId: body.planId,
         customDomain: body.customDomain,
+        adminName: body.adminName,
+        adminEmail: body.adminEmail,
+        adminPassword: body.adminPassword,
       }, user.userId)
       
       return this.success(c, store, 'Store created and pending approval', 201)

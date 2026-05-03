@@ -28,6 +28,10 @@ export const createStoreSchema = z.object({
     .regex(domainRegex, 'Invalid domain format. Use format: mystore.com or shop.mystore.com')
     .toLowerCase()
     .optional(),
+  // Optional: Create an initial store admin user
+  adminName: z.string().min(2).optional(),
+  adminEmail: z.string().email().optional(),
+  adminPassword: z.string().min(6).optional(),
 })
 
 export const updateStoreSchema = z.object({

@@ -7,7 +7,7 @@ export const APP_ROUTES = {
     index: '/admin',
   },
   seller: {
-    index: '/store-admin',
+    index: '/dashboard',
   },
   dashboard: {
     index: '/dashboard',

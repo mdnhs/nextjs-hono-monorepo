@@ -1,373 +1,105 @@
-# 🏗️ Multi-Tenant SaaS Ecommerce Architecture
+# 🏗️ SaaS Architecture Guide
 
-## 📌 Overview
+## 📌 High-Level Design
 
-This project is a **multi-tenant SaaS ecommerce platform** where:
-
-- A single application serves multiple independent stores (tenants)
-- Each store has:
-  - Its own domain or subdomain
-  - A dedicated admin panel
-  - Fully isolated data
-
-- A central system manages:
-  - Users
-  - Billing
-  - Store lifecycle
+The system follows a **Shared Database, Shared Application** multi-tenant model. Tenant isolation is enforced at the network (Middleware) and application (Query) layers.
 
 ---
 
-## 🌐 System Domains
+## 🧠 Tenant Identification Strategy
 
-### 1. Main Application (Global Layer)
+### 1. Network Layer (Next.js `proxy.ts`)
 
-```
-https://yourapp.com
-```
+The `proxy.ts` middleware acts as a traffic router. It extracts the `host` header and:
 
-Handles:
+- **Case A: Custom Domain** (`mystore.com`) → API check for `Store.customDomain` → Rewrite to `/[slug]`.
+- **Case B: Subdomain** (`store-a.example.com`) → Extract `store-a` → Rewrite to `/[store-a]`.
+- **Case C: Global App** (`example.com`) → No rewrite, serve Landing/Dashboard.
 
-- Landing page
-- Authentication
-- Global dashboard
-- Billing & subscriptions
+### 2. Application Layer (Hono `resolveTenant`)
 
----
-
-### 2. Tenant Stores (Store Layer)
-
-```
-https://store1.yourapp.com
-https://store2.yourapp.com
-```
-
-Handles:
-
-- Public storefront
-- Store-specific admin panel
+The API uses a corresponding middleware to inject the `tenantStore` into the Hono context (`c.get('tenantStore')`), ensuring every controller downstream knows which store it is operating on.
 
 ---
 
-### 3. Custom Domains (Optional)
+## 🔒 Security & Access Control
 
-```
-https://mystore.com → mapped to store1
-```
+### Role-Based Access Control (RBAC)
 
----
+We utilize a dual-layer RBAC system:
 
-## 🧠 Core Request Flow
+1. **Global Roles** (`UserRole`): `ADMIN`, `SELLER`, `BUYER`.
+2. **Tenant Roles** (`StoreStaffRole`): `MANAGER`, `EDITOR`, `SUPPORT`.
 
-```
-User Request
-    ↓
-DNS / CDN (Cloudflare)
-    ↓
-Edge / Server (Next.js + Hono)
-    ↓
-Middleware (Extract Host)
-    ↓
-Tenant Identification (Database Lookup)
-    ↓
-Routing Decision
-    ↓
-Database Query (tenant-scoped)
-    ↓
-Response to User
-```
+#### Access Inheritance
+
+- **Sellers** implicitly have full access to stores they **own**.
+- **Staff** only have access to stores they are **invited** to, with granular permissions based on their role (e.g., `SUPPORT` cannot change Theme settings).
 
 ---
 
-## 🧩 Application Layers
+## 🗄️ Database Architecture
 
-### 1. Global Layer (User Context)
+### Isolation Mode: Row-Level Isolation
 
-Accessible via:
-
-```
-yourapp.com
-```
-
-Features:
-
-- User registration & login
-- Multi-store dashboard
-- Subscription management
-- Billing
-
----
-
-### 2. Tenant Layer (Store Context)
-
-Accessible via:
-
-```
-store1.yourapp.com
-```
-
-Features:
-
-- Storefront (customers)
-- Store admin panel (owners)
-
----
-
-## 🔄 User Flows
-
-### 1. Seller Journey
-
-```
-Landing Page
-    ↓
-Sign Up / Login
-    ↓
-Dashboard
-    ↓
-Create Store
-    ↓
-Store Activated
-    ↓
-Redirect to Store Admin Panel
-```
-
----
-
-### 2. Store Creation Flow
-
-```
-Dashboard
-    ↓
-Create Store
-    ↓
-Input:
-    - Store Name
-    - Subdomain or Domain
-    - Subscription Plan
-    ↓
-Save to Database
-    ↓
-Provision Store
-```
-
----
-
-### 3. Customer Purchase Flow
-
-```
-Visit Store
-    ↓
-Browse Products
-    ↓
-Add to Cart
-    ↓
-Checkout
-    ↓
-Payment Processing
-    ↓
-Order Created
-```
-
----
-
-## 🧭 Routing Strategy
-
-```ts
-const host = req.headers.host;
-
-if (host === 'yourapp.com') {
-  // Global application (landing, dashboard, auth)
-} else {
-  const subdomain = host.split('.')[0];
-  const store = findStoreBySubdomain(subdomain);
-
-  // Load tenant-specific application
-}
-```
-
----
-
-## 🗄️ Database Design (Shared DB, Multi-Tenant)
-
-### Core Tables
-
-#### users
-
-- id
-- email
-- password
-
-#### stores
-
-- id
-- user_id
-- name
-- subdomain
-- custom_domain
-- plan
-
-#### products
-
-- id
-- store_id
-- name
-- price
-
-#### orders
-
-- id
-- store_id
-- total
-
-#### customers
-
-- id
-- store_id
-
----
-
-## 🔑 Multi-Tenancy Strategy
-
-### Approach: Shared Database + `store_id`
-
-All queries must include tenant isolation:
+Every tenant-specific table contains a `storeId` foreign key.
 
 ```sql
-SELECT * FROM products WHERE store_id = $1;
+-- Conceptual isolation check
+SELECT * FROM products WHERE store_id = :current_tenant_id;
 ```
 
----
+### Core Schema Modules
 
-## ⚙️ Tech Stack
-
-### Frontend
-
-- Next.js
-
-### Backend
-
-- Hono (API layer)
-
-### Database
-
-- PostgreSQL (Neon recommended)
-
-### Edge / CDN
-
-- Cloudflare
+- **Identity**: `User`, `Customer` (Store-specific buyer accounts).
+- **Core Shop**: `Store`, `Product`, `ProductVariant`, `Category`.
+- **Transactions**: `Order`, `OrderItem`, `Payment`, `Refund`.
+- **CMS**: `ThemeSetting`, `Page`, `Navigation`, `NavigationItem`.
+- **Inventory**: `Location`, `InventoryLevel`, `InventoryTransaction`.
+- **Utility**: `Asset` (R2 mapping), `Webhook`, `IdempotencyKey`.
 
 ---
 
-## 🔐 Authentication Strategy
+## 📁 Storage (Cloudflare R2)
 
-### Global Authentication
+Multi-tenant asset isolation is handled via path prefixing:
+`{BUCKET}/{storeId}/{unique_asset_id}-{filename}`
 
-- Users authenticate via main domain
-- Sessions are shared across dashboard and stores (via cookies or JWT)
-
-### Store Admin Access
-
-```
-store1.yourapp.com/admin
-```
+Storage limits (e.g., 100MB) are enforced by the `AssetService` by summing `sizeBytes` in the DB before allowing new uploads.
 
 ---
 
-## 🧱 Folder Structure (Monorepo)
+## 🔄 Core Flows
 
-```
-apps/
-  web/        # Next.js frontend
-  api/        # Hono backend
+### 1. Store Creation & Onboarding
 
-packages/
-  db/         # Database schema & queries (Drizzle ORM)
-  ui/         # Shared UI components
-  utils/      # Shared utilities
-  shared/     # Shared constants and utilities
-  types/      # Shared TypeScript types
-  eslint-config/  # Shared ESLint configuration
-  typescript-config/  # Shared tsconfig presets
-```
+1. **Seller** creates a store in the SaaS Dashboard.
+2. API creates the **Store** record.
+3. API creates an **initial Store Admin** user.
+4. API creates a **StoreStaff** record linking them as `MANAGER`.
+5. Redirect to Dashboard for multi-store overview.
 
----
+### 2. Storefront Request
 
-## 🔥 Middleware Responsibilities (Critical)
-
-- Extract host from request
-- Identify tenant (store)
-- Attach tenant context to request
-- Enforce tenant-based access control
+1. Request hits `proxy.ts`.
+2. Tenant identified via Host header.
+3. Rewritten to `/[storeSlug]`.
+4. Page fetches data from Hono via `storeService.getStoreBySlug`.
+5. Hono enforces `resolveTenant` and returns store-specific theme, products, and navigation.
 
 ---
 
-## 🚀 Deployment Architecture
+## 🚀 Scaling & Resilience
 
-```
-User
-  ↓
-Cloudflare (CDN + DNS)
-  ↓
-Edge Runtime
-  ↓
-Next.js App
-  ↓
-Hono API
-  ↓
-PostgreSQL (Neon)
-```
+- **Database**: Serverless PostgreSQL (Neon) with connection pooling.
+- **API**: Hono runs on Node.js, compatible with Edge runtimes (Bun/Cloudflare Workers).
+- **Caching**: Tenant lookups are cached in `proxy.ts` (Next.js Cache) and `tenant.ts` (LRU).
+- **Idempotency**: Critical for Payments and Order creation to prevent duplicate processing.
 
 ---
 
-## 🧠 Scaling Strategy
+## 🛡️ Critical Invariants
 
-- Stateless application servers
-- CDN caching for static assets
-- Database indexing on `store_id`
-- Read replicas for scaling (future)
-- Queue system for background jobs (optional)
-
----
-
-## ⚠️ Critical Rules
-
-- ❌ Never mix tenant data
-- ❌ Never skip tenant validation
-- ✅ Always filter by `store_id`
-- ✅ Always verify domain-to-tenant mapping
-
----
-
-## 🎯 Future Enhancements
-
-- Custom domain support with automatic SSL
-- Per-store theme system
-- Plugin / extension system
-- Role-based access (store staff)
-- Advanced analytics dashboard
-
----
-
-## 🧩 Core Principle
-
-```
-HOST → TENANT → DATA ISOLATION
-```
-
-If this principle is implemented correctly, the system will be:
-
-- Scalable
-- Secure
-- Maintainable
-
----
-
-## ✅ Summary
-
-- Global app manages users, billing, and store creation
-- Tenant apps handle store operations
-- Subdomain or custom domain determines tenant context
-- Data isolation is enforced via `store_id`
-
----
-
-**End of Architecture**
+- ❌ **No Cross-Tenant Queries**: Never select data without `where(eq(t.storeId, currentTenantId))`.
+- ❌ **No Global Session Leakage**: Store A customers cannot log into Store B.
+- ✅ **Staff Scoping**: Verify `storeStaffs` presence for any staff-level request.

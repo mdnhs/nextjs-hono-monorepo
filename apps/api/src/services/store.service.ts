@@ -1,9 +1,10 @@
 import { db } from '../db'
-import { stores, subscriptions, plans, products, orders, users } from '../db/schema'
+import { stores, subscriptions, plans, products, orders, users, storeStaffs } from '../db/schema'
 import type { StoreStatus, UserRole } from '../db/schema'
 import { eq, and, ne, desc, count, sql } from 'drizzle-orm'
 import { BaseService } from './base.service'
 import { invalidateTenantCache } from '../middlewares/tenant'
+import bcrypt from 'bcryptjs'
 
 const cacheKeysFor = (s: { slug?: string | null; customDomain?: string | null }): string[] => {
   const keys: string[] = []
@@ -19,6 +20,9 @@ export interface CreateStoreData {
   logo?: string
   planId?: string
   customDomain?: string
+  adminName?: string
+  adminEmail?: string
+  adminPassword?: string
 }
 
 export interface UpdateStoreData {
@@ -260,6 +264,32 @@ export class StoreService extends BaseService {
           customDomain: data.customDomain || null,
         })
         .returning()
+
+      // 1. Create initial admin user if provided
+      if (data.adminEmail && data.adminPassword && data.adminName) {
+        // Check if user already exists
+        let adminUser = await tx.query.users.findFirst({
+          where: eq(users.email, data.adminEmail)
+        })
+
+        if (!adminUser) {
+          const hashedPassword = await bcrypt.hash(data.adminPassword, 10)
+          const [created] = await tx.insert(users).values({
+            email: data.adminEmail,
+            name: data.adminName,
+            password: hashedPassword,
+            role: 'SELLER' // Store admins are effectively sellers of their own tenant
+          }).returning()
+          adminUser = created
+        }
+
+        // Add as MANAGER to store staff
+        await tx.insert(storeStaffs).values({
+          storeId: newStore.id,
+          userId: adminUser.id,
+          role: 'MANAGER'
+        })
+      }
 
       if (data.planId) {
         const plan = await tx.query.plans.findFirst({ where: eq(plans.id, data.planId) })
