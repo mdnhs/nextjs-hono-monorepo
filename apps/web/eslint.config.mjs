@@ -31,6 +31,8 @@ const eslintConfig = [
             'src/services/**/*',
             'src/validations/**/*',
             'src/styles/**/*',
+            'src/proxy.ts',
+            'src/instrumentation.ts',
           ],
         },
         {
