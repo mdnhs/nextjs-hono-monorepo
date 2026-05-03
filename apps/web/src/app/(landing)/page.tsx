@@ -1,4 +1,10 @@
-import { HeroSection, StatsSection, FeaturesSection, CtaSection } from '@/features/landing/components';
+import {
+  HeroSection,
+  StatsSection,
+  FeaturesSection,
+  PricingTeaserSection,
+  CtaSection,
+} from '@/features/landing/components';
 
 export default function LandingPage() {
   return (
@@ -6,6 +12,7 @@ export default function LandingPage() {
       <HeroSection />
       <StatsSection />
       <FeaturesSection />
+      <PricingTeaserSection />
       <CtaSection />
     </>
   );
