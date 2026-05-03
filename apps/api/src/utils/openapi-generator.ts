@@ -322,35 +322,25 @@ const routes: RouteInfo[] = [
     },
   },
 
-  // Cart
+  // Storefront Cart
   {
-    path: '/api/v1/cart',
+    path: '/api/v1/storefront/cart',
     method: 'get',
-    tags: ['Cart'],
-    summary: 'Get user cart',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Get storefront cart',
+    description: 'Retrieves the cart for the current visitor session (scoped by store and customer token).',
     responses: {
       '200': { description: 'Cart contents' },
     },
   },
   {
-    path: '/api/v1/cart/summary',
-    method: 'get',
-    tags: ['Cart'],
-    summary: 'Get cart summary',
-    requiresAuth: true,
-    responses: {
-      '200': { description: 'Cart summary' },
-    },
-  },
-  {
-    path: '/api/v1/cart',
+    path: '/api/v1/storefront/cart/items',
     method: 'post',
-    tags: ['Cart'],
-    summary: 'Add item to cart',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Add item to storefront cart',
     requestBody: {
       productId: { type: 'string' },
+      variantId: { type: 'string' },
       quantity: { type: 'integer', minimum: 1 },
     },
     responses: {
@@ -358,49 +348,49 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/v1/cart/:productId',
+    path: '/api/v1/storefront/cart/items/:itemId',
     method: 'patch',
-    tags: ['Cart'],
-    summary: 'Update cart item',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Update storefront cart item',
     params: {
-      productId: { type: 'string', description: 'Product ID' },
+      itemId: { type: 'string', description: 'Cart Item ID' },
+    },
+    requestBody: {
+      quantity: { type: 'integer', minimum: 0 },
     },
     responses: {
       '200': { description: 'Cart item updated' },
     },
   },
   {
-    path: '/api/v1/cart/:productId',
+    path: '/api/v1/storefront/cart/items/:itemId',
     method: 'delete',
-    tags: ['Cart'],
-    summary: 'Remove item from cart',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Remove item from storefront cart',
     params: {
-      productId: { type: 'string', description: 'Product ID' },
+      itemId: { type: 'string', description: 'Cart Item ID' },
     },
     responses: {
       '200': { description: 'Item removed from cart' },
     },
   },
   {
-    path: '/api/v1/cart/clear',
+    path: '/api/v1/storefront/cart',
     method: 'delete',
-    tags: ['Cart'],
-    summary: 'Clear cart',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Clear storefront cart',
     responses: {
       '200': { description: 'Cart cleared' },
     },
   },
 
-  // Orders
+  // Storefront Checkout
   {
-    path: '/api/v1/orders',
+    path: '/api/v1/storefront/checkout',
     method: 'post',
-    tags: ['Orders'],
-    summary: 'Create an order',
-    requiresAuth: true,
+    tags: ['Storefront'],
+    summary: 'Process storefront checkout',
+    description: 'Converts the current cart into an order. Subject to rate limits and idempotency.',
     requestBody: {
       shippingAddress: {
         type: 'object',
@@ -412,12 +402,14 @@ const routes: RouteInfo[] = [
           country: { type: 'string' },
           phone: { type: 'string' },
         },
+        required: ['street', 'city', 'state', 'postalCode', 'country', 'phone'],
       },
-      discountCode: { type: 'string', description: 'Coupon code to apply' },
-      locationId: { type: 'string', description: 'Fulfillment location ID. Defaults to store default location.' },
+      discountCode: { type: 'string' },
     },
     responses: {
       '201': { description: 'Order created' },
+      '400': { description: 'Validation error or empty cart' },
+      '402': { description: 'Order limit reached' },
     },
   },
   {
@@ -1082,7 +1074,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/v1/payments/webhooks/{provider}',
+    path: '/api/v1/payments/webhooks/:provider',
     method: 'post',
     tags: ['Payments'],
     summary: 'Provider webhooks',
@@ -1176,7 +1168,7 @@ const routes: RouteInfo[] = [
     },
   },
   {
-    path: '/api/v1/webhooks/{id}',
+    path: '/api/v1/webhooks/:id',
     method: 'delete',
     tags: ['Webhooks'],
     summary: 'Delete a webhook',
@@ -1186,6 +1178,207 @@ const routes: RouteInfo[] = [
     },
     responses: {
       '200': { description: 'Webhook deleted' },
+    },
+  },
+
+  // Themes
+  {
+    path: '/api/v1/themes/published',
+    method: 'get',
+    tags: ['Themes'],
+    summary: 'Get published theme',
+    description: 'Public storefront endpoint to get the currently active theme layout.',
+    responses: {
+      '200': { description: 'Theme data' },
+    },
+  },
+  {
+    path: '/api/v1/themes/store/:storeId',
+    method: 'get',
+    tags: ['Themes'],
+    summary: 'List store themes',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'List of themes' },
+    },
+  },
+  {
+    path: '/api/v1/themes/:id',
+    method: 'get',
+    tags: ['Themes'],
+    summary: 'Get theme details',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Theme ID' },
+    },
+    responses: {
+      '200': { description: 'Theme with layout' },
+    },
+  },
+  {
+    path: '/api/v1/themes/store/:storeId',
+    method: 'post',
+    tags: ['Themes'],
+    summary: 'Create theme',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      name: { type: 'string' },
+      settings: { type: 'object' },
+    },
+    responses: {
+      '201': { description: 'Theme created' },
+    },
+  },
+  {
+    path: '/api/v1/themes/:id/publish',
+    method: 'post',
+    tags: ['Themes'],
+    summary: 'Publish theme',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Theme ID' },
+    },
+    responses: {
+      '200': { description: 'Theme published' },
+    },
+  },
+
+  // CMS
+  {
+    path: '/api/v1/cms/:storeId/theme',
+    method: 'get',
+    tags: ['CMS'],
+    summary: 'Get theme settings',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Theme settings' },
+    },
+  },
+  {
+    path: '/api/v1/cms/:storeId/pages',
+    method: 'get',
+    tags: ['CMS'],
+    summary: 'List pages',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'List of pages' },
+    },
+  },
+  {
+    path: '/api/v1/cms/:storeId/navigation',
+    method: 'get',
+    tags: ['CMS'],
+    summary: 'Get navigation menus',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Navigation menus' },
+    },
+  },
+
+  // Staff
+  {
+    path: '/api/v1/staff/:storeId',
+    method: 'get',
+    tags: ['Staff'],
+    summary: 'List store staff',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'List of staff members' },
+    },
+  },
+  {
+    path: '/api/v1/staff/:storeId/invite',
+    method: 'post',
+    tags: ['Staff'],
+    summary: 'Invite staff member',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      userId: { type: 'string' },
+      role: { type: 'string', enum: ['MANAGER', 'EDITOR', 'SUPPORT'] },
+    },
+    responses: {
+      '200': { description: 'Staff member added' },
+    },
+  },
+
+  // Domains
+  {
+    path: '/api/v1/domains/check',
+    method: 'get',
+    tags: ['Domains'],
+    summary: 'Check domain binding (Caddy)',
+    query: {
+      domain: { type: 'string', description: 'Hostname to check' },
+    },
+    responses: {
+      '200': { description: 'Domain is bound' },
+      '404': { description: 'Domain not bound' },
+    },
+  },
+  {
+    path: '/api/v1/domains/store/:storeId/request',
+    method: 'post',
+    tags: ['Domains'],
+    summary: 'Request domain verification',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    requestBody: {
+      hostname: { type: 'string' },
+    },
+    responses: {
+      '200': { description: 'Verification requested' },
+    },
+  },
+
+  // Assets
+  {
+    path: '/api/v1/assets/:storeId',
+    method: 'get',
+    tags: ['Assets'],
+    summary: 'List store assets',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'List of assets' },
+    },
+  },
+  {
+    path: '/api/v1/assets/:storeId/upload',
+    method: 'post',
+    tags: ['Assets'],
+    summary: 'Upload asset',
+    requiresAuth: true,
+    params: {
+      storeId: { type: 'string', description: 'Store ID' },
+    },
+    responses: {
+      '200': { description: 'Asset uploaded' },
+      '402': { description: 'Storage limit exceeded' },
     },
   },
 ]
@@ -1213,17 +1406,22 @@ export function generateOpenAPISpec(): OpenAPIV3.Document {
     tags: [
       { name: 'Health', description: 'Health check endpoints' },
       { name: 'Auth', description: 'Authentication endpoints' },
+      { name: 'Storefront', description: 'Public storefront operations (Cart, Checkout)' },
       { name: 'Stores', description: 'Store management' },
       { name: 'Products', description: 'Product management' },
-      { name: 'Cart', description: 'Shopping cart operations' },
       { name: 'Orders', description: 'Order management' },
       { name: 'Reviews', description: 'Product reviews' },
       { name: 'Categories', description: 'Product categories' },
+      { name: 'Themes', description: 'Theme and layout management' },
+      { name: 'CMS', description: 'Content management (Pages, Navigation)' },
       { name: 'Plans', description: 'Subscription plans' },
       { name: 'Admin', description: 'Admin operations' },
       { name: 'Subscriptions', description: 'Store subscriptions' },
+      { name: 'Staff', description: 'Store staff management' },
       { name: 'Payments', description: 'Payment processing' },
       { name: 'Inventory', description: 'Multi-location inventory' },
+      { name: 'Domains', description: 'Custom domain management' },
+      { name: 'Assets', description: 'Media asset management' },
       { name: 'Webhooks', description: 'Outbound webhooks' },
     ],
     paths: buildPaths(),
