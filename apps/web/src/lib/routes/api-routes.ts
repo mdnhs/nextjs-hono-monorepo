@@ -5,6 +5,12 @@ export const API_ROUTES = {
     profile: '/auth/profile',
     register: '/auth/register',
   },
+  storefrontAuth: {
+    login: '/storefront/auth/login',
+    logout: '/storefront/auth/logout',
+    profile: '/storefront/auth/profile',
+    register: '/storefront/auth/register',
+  },
   stores: {
     base: '/stores',
     details: (id: string) => `/stores/${id}`,

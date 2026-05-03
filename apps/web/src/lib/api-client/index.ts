@@ -139,6 +139,19 @@ const createHeaders = async (customHeaders?: HeadersInit): Promise<Headers> => {
   const headers = new Headers(API_CONFIG.DEFAULT_HEADERS);
   const token = await getAuthToken();
   if (token) headers.append('Authorization', `Bearer ${token}`);
+
+  // Automatically detect store slug from hostname and add as header
+  if (!isServerSide()) {
+    const host = window.location.hostname;
+    const baseDomain = process.env.APP_DOMAIN || 'localhost';
+    if (host.endsWith(`.${baseDomain}`)) {
+      const slug = host.replace(`.${baseDomain}`, '');
+      if (slug && slug !== 'www') {
+        headers.append('x-store-slug', slug);
+      }
+    }
+  }
+
   if (isServerSide()) {
     const clientIP = await getClientIP();
     if (clientIP) {

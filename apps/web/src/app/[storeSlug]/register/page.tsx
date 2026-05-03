@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { useRegister } from '@/features/auth/hooks/api/mutation/use-register';
+import { useStorefrontRegister } from '@/features/auth/hooks/api/mutation/use-storefront-register';
 import { registerSchema } from '@/features/auth/validations/register-schema';
 import { useStore } from '@/hooks/api/query/use-stores';
 
@@ -24,7 +24,7 @@ export default function BuyerRegisterPage() {
   const { data: storeResponse } = useStore(storeSlug, true);
   const store = storeResponse?.data;
 
-  const { mutate: register, isPending } = useRegister();
+  const { mutate: register, isPending } = useStorefrontRegister();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 

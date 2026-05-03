@@ -26,6 +26,7 @@ import staffRouter from "./routes/staff";
 import assetsRouter from "./routes/assets";
 import themesRouter from "./routes/themes";
 import domainsRouter from "./routes/domains";
+import storefrontAuthRouter from "./routes/storefront-auth";
 import { resolveTenant } from "./middlewares/tenant";
 
 const app = new Hono();
@@ -50,8 +51,8 @@ app.use(
       
       if (allowedOrigins.includes(origin)) return origin;
       
-      // In development, be extra permissive with localhost origins
-      if (process.env.NODE_ENV === "development" && origin.includes("localhost:")) {
+      // In development, be extra permissive with localhost origins (handles any port and subdomain)
+      if (process.env.NODE_ENV === "development" && (origin.includes("localhost:") || origin.includes(".localhost:") || origin === "http://localhost")) {
         return origin;
       }
 
@@ -78,37 +79,14 @@ app.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
-    exposeHeaders: ["Content-Length", "X-Request-Id"],
+    allowHeaders: ["Content-Type", "Authorization", "x-store-slug", "x-customer-token"],
+    exposeHeaders: ["Content-Length", "X-Request-Id", "Set-Cookie"],
     maxAge: 86400,
   })
 );
 
 app.use("*", prettyJSON());
 app.use("*", resolveTenant);
-
-app.onError((err, c) => {
-  console.error(`[API Error] ${err.message}`);
-  
-  const status = err instanceof HTTPException ? err.status : 500;
-  const message = err.message || "Internal Server Error";
-
-  // Re-apply CORS headers for error responses to avoid false CORS errors in browser
-  const origin = c.req.header("Origin");
-  if (origin) {
-    c.header("Access-Control-Allow-Origin", origin);
-    c.header("Access-Control-Allow-Credentials", "true");
-  }
-
-  return c.json(
-    {
-      error: true,
-      message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    },
-    status
-  );
-});
 
 const PUBLIC_ROUTES = [
   { method: "GET", path: "/" },
@@ -131,7 +109,9 @@ const PUBLIC_PREFIXES = [
   { method: "GET", path: "/api/v1/plans/" },
   // Payment webhooks: provider-signed, must bypass our JWT auth.
   { method: "POST", path: "/api/v1/payments/webhooks/" },
-  // Storefront cart + checkout: own customer-token auth, runs without platform JWT.
+  // Storefront auth, cart + checkout: own customer-token auth, runs without platform JWT.
+  { method: "POST", path: "/api/v1/storefront/auth/login" },
+  { method: "POST", path: "/api/v1/storefront/auth/register" },
   { method: "GET", path: "/api/v1/storefront/" },
   { method: "POST", path: "/api/v1/storefront/" },
   { method: "PATCH", path: "/api/v1/storefront/" },
@@ -177,9 +157,17 @@ app.use("/api/v1/*", async (c, next) => {
 });
 
 app.onError((err, c) => {
+  console.error(`[API Error] ${err.message}`);
+
   const status = err instanceof HTTPException ? err.status : 500;
   const message = err.message || "Internal Server Error";
   const causes = err instanceof HTTPException ? err.cause : undefined;
+
+  const origin = c.req.header("Origin");
+  if (origin) {
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Access-Control-Allow-Credentials", "true");
+  }
 
   return c.json(
     {
@@ -187,6 +175,7 @@ app.onError((err, c) => {
       error: true,
       message,
       ...(causes && { causes }),
+      ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
     },
     status as any
   );
@@ -254,6 +243,7 @@ app.route("/api/v1/staff", staffRouter);
 app.route("/api/v1/assets", assetsRouter);
 app.route("/api/v1/themes", themesRouter);
 app.route("/api/v1/domains", domainsRouter);
+app.route("/api/v1/storefront/auth", storefrontAuthRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

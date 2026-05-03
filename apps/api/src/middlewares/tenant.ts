@@ -56,22 +56,54 @@ const lookupByDomain = async (hostname: string): Promise<TenantStore | null> => 
 }
 
 export const resolveTenant = async (c: Context, next: Next) => {
-  const host = c.req.header('host') ?? ''
+  const host = c.req.header('x-forwarded-host') ?? c.req.header('host') ?? ''
+  const origin = c.req.header('origin') ?? ''
+  const referer = c.req.header('referer') ?? ''
+  const headerSlug = c.req.header('x-store-slug')
   const path = c.req.path
 
-  let storeSlug: string | undefined
+  let storeSlug: string | undefined = headerSlug
 
   const hostname = host.split(':')[0] ?? ''
   const hostParts = hostname.split('.')
 
-  if (hostname.endsWith('.localhost')) {
-    const subdomain = hostname.slice(0, hostname.length - '.localhost'.length)
-    if (subdomain) storeSlug = subdomain
-  } else if (hostParts.length > 2) {
-    const appDomain = process.env.APP_DOMAIN ?? 'example.com'
-    const expectedDomain = `.${appDomain}`
-    if (hostname.endsWith(expectedDomain)) {
-      storeSlug = hostname.slice(0, hostname.length - expectedDomain.length)
+  // 1. Try host header (for subdomains or custom domains)
+  if (!storeSlug) {
+    if (hostname.endsWith('.localhost')) {
+      const subdomain = hostname.slice(0, hostname.length - '.localhost'.length)
+      if (subdomain) storeSlug = subdomain
+    } else if (hostParts.length > 2) {
+      const appDomain = process.env.APP_DOMAIN ?? 'example.com'
+      const expectedDomain = `.${appDomain}`
+      if (hostname.endsWith(expectedDomain)) {
+        storeSlug = hostname.slice(0, hostname.length - expectedDomain.length)
+      }
+    }
+  }
+
+  // 2. Try Origin header (for direct API calls from browser on a subdomain)
+  if (!storeSlug && origin) {
+    try {
+      const originUrl = new URL(origin)
+      const originHost = originUrl.hostname
+      if (originHost.endsWith('.localhost')) {
+        storeSlug = originHost.slice(0, originHost.length - '.localhost'.length)
+      }
+    } catch (e) {
+      // Invalid URL
+    }
+  }
+
+  // 3. Try Referer header (fallback for Origin)
+  if (!storeSlug && referer) {
+    try {
+      const refererUrl = new URL(referer)
+      const refererHost = refererUrl.hostname
+      if (refererHost.endsWith('.localhost')) {
+        storeSlug = refererHost.slice(0, refererHost.length - '.localhost'.length)
+      }
+    } catch (e) {
+      // Invalid URL
     }
   }
 
