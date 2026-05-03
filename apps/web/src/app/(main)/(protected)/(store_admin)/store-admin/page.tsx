@@ -1,5 +1,5 @@
-import { StoreOverview } from '@/features/store-admin/components';
+import { redirect } from 'next/navigation';
 
-export default function StoreAdminPage() {
-  return <StoreOverview />;
+export default function StoreAdminRedirect() {
+  redirect('/dashboard');
 }

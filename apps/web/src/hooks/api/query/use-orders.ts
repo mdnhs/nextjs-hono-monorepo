@@ -22,3 +22,11 @@ export const useSellerOrders = (filters: any = {}) => {
     queryFn: () => orderService.getSellerOrders(filters),
   });
 };
+
+export const useStoreOrders = (storeId: string, filters: any = {}) => {
+  return useQuery({
+    queryKey: ['store-orders', storeId, filters],
+    queryFn: () => orderService.getStoreOrders(storeId, filters),
+    enabled: !!storeId,
+  });
+};

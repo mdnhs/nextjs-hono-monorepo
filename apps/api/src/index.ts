@@ -36,16 +36,42 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
+      if (!origin) return null;
+      
+      const appDomain = process.env.APP_DOMAIN || "localhost";
+      const isLocalhost = appDomain === "localhost";
+
+      // Exact matches for common local development ports
       const allowedOrigins = [
-        "http://localhost:3001",
         "http://localhost:3000",
+        "http://localhost:3001",
         "https://localhost:3001",
       ];
       
-      if (!origin) return null;
       if (allowedOrigins.includes(origin)) return origin;
-      if (origin.startsWith("http://localhost:") || origin.startsWith("https://localhost:")) {
+      
+      // In development, be extra permissive with localhost origins
+      if (process.env.NODE_ENV === "development" && origin.includes("localhost:")) {
         return origin;
+      }
+
+      try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+
+        // Allow any subdomain of localhost or the configured APP_DOMAIN
+        if (isLocalhost) {
+          if (hostname === "localhost" || hostname.endsWith(".localhost")) {
+            return origin;
+          }
+        } else {
+          if (hostname === appDomain || hostname.endsWith(`.${appDomain}`)) {
+            return origin;
+          }
+        }
+      } catch (e) {
+        // Fallback for malformed URLs or unexpected formats
+        if (origin.includes("localhost:")) return origin;
       }
       
       return null;
@@ -60,6 +86,29 @@ app.use(
 
 app.use("*", prettyJSON());
 app.use("*", resolveTenant);
+
+app.onError((err, c) => {
+  console.error(`[API Error] ${err.message}`);
+  
+  const status = err instanceof HTTPException ? err.status : 500;
+  const message = err.message || "Internal Server Error";
+
+  // Re-apply CORS headers for error responses to avoid false CORS errors in browser
+  const origin = c.req.header("Origin");
+  if (origin) {
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Access-Control-Allow-Credentials", "true");
+  }
+
+  return c.json(
+    {
+      error: true,
+      message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    },
+    status
+  );
+});
 
 const PUBLIC_ROUTES = [
   { method: "GET", path: "/" },
