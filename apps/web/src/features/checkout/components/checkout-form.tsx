@@ -3,19 +3,25 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createOrderSchema } from '@/validations/order';
-import { useCreateOrder } from '@/hooks/api/mutation/use-order-mutations';
+import { useCart } from '@/hooks/api/query/use-cart';
+import { useCartMutations } from '@/hooks/api/mutation/use-cart-mutations';
 import { useLocations } from '@/hooks/api/query/use-inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export function CheckoutForm() {
   const router = useRouter();
-  const createOrder = useCreateOrder();
+  const { data: cartResponse, isLoading: isCartLoading } = useCart();
+  const { checkout } = useCartMutations();
   const { data: locationsResponse } = useLocations();
   
   const form = useForm({
@@ -26,7 +32,7 @@ export function CheckoutForm() {
         city: '',
         state: '',
         postalCode: '',
-        country: '',
+        country: 'USA',
         phone: '',
       },
       discountCode: '',
@@ -34,18 +40,33 @@ export function CheckoutForm() {
     },
   });
 
+  const cart = cartResponse?.data;
+  const items = cart?.items || [];
+
   const onSubmit = async (data: any) => {
-    try {
-      const response = await createOrder.mutateAsync(data);
-      if (response.data) {
-        toast.success('Order placed successfully!');
-        // In a real app, redirect to payment or order confirmation
-        router.push(`/order/confirmation/${response.data[0].id}`);
+    checkout.mutate(data, {
+      onSuccess: (res: any) => {
+        if (!res.error) {
+          toast.success('Order placed successfully!');
+          router.push('/order-confirmation');
+        }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to place order');
-    }
+    });
   };
+
+  if (isCartLoading) return <div className="p-8 text-center">Loading cart...</div>;
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <ShoppingBag className="h-12 w-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold">Your cart is empty</h2>
+        <Button asChild variant="outline">
+          <Link href="/">Back to Shop</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const locations = locationsResponse?.data ?? [];
 
@@ -176,8 +197,8 @@ export function CheckoutForm() {
                 />
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full" size="lg" disabled={createOrder.isPending}>
-                  {createOrder.isPending ? 'Processing Order...' : 'Complete Purchase'}
+                <Button type="submit" className="w-full" size="lg" disabled={checkout.isPending}>
+                  {checkout.isPending ? 'Processing Order...' : 'Complete Purchase'}
                 </Button>
               </CardFooter>
             </Card>
@@ -190,9 +211,49 @@ export function CheckoutForm() {
           <CardHeader>
             <CardTitle>Order Summary</CardTitle>
           </CardHeader>
-          <CardContent>
-            {/* Logic for cart items would go here */}
-            <p className="text-sm text-muted-foreground italic">Cart summary logic pending integration with cart feature...</p>
+          <CardContent className="space-y-4">
+            <ScrollArea className="h-64 pr-4">
+              <div className="space-y-4">
+                {items.map((item: any) => (
+                  <div key={item.id} className="flex justify-between text-sm">
+                    <span className="flex-1 line-clamp-1">{item.quantity}x {item.product?.name}</span>
+                    <span className="font-medium ml-4">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: item.currency || 'USD',
+                      }).format(item.price * item.quantity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: cart?.currency || 'USD',
+                  }).format(cart?.total || 0)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-green-600 font-medium">Free</span>
+              </div>
+              <div className="flex justify-between font-bold text-lg pt-2">
+                <span>Total</span>
+                <span>
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: cart?.currency || 'USD',
+                  }).format(cart?.total || 0)}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

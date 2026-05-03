@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShoppingCart } from 'lucide-react';
 import Image from 'next/image';
+import { AddToCartButton } from './add-to-cart-button';
 
 interface ProductGridProps {
   storeId: string;
@@ -75,10 +76,7 @@ export function ProductGrid({ storeId }: ProductGridProps) {
             </p>
           </CardContent>
           <CardFooter className="p-4 pt-0">
-            <Button className="w-full gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              Add to Cart
-            </Button>
+            <AddToCartButton productId={product.id} className="w-full" />
           </CardFooter>
         </Card>
       ))}
