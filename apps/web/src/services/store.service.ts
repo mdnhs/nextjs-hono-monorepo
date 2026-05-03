@@ -49,7 +49,13 @@ export class StoreService extends BaseService {
     return this.formatResponse(response);
   }
 
-  async getLimits(id: string): Promise<ServiceResponse<any>> {
+  async cancelSubscription(id: string): Promise<ServiceResponse<any>> {
+    const response = await restApiClient.post<any>(API_ROUTES.stores.cancelSubscription(id));
+    return this.formatResponse(response);
+  }
+
+  async limits(id: string): Promise<ServiceResponse<any>> {
+
     const response = await restApiClient.get<any>(API_ROUTES.stores.limits(id));
     return this.formatResponse(response);
   }

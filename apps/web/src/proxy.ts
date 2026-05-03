@@ -42,7 +42,7 @@ const lookupCustomDomain = async (host: string): Promise<string | null> => {
 
   const promise = (async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       // 60s revalidation gives a second layer behind the in-memory cache when running multiple instances.
       const res = await fetch(`${apiUrl}/api/v1/stores/domain/${encodeURIComponent(host)}`, {
         next: { revalidate: 60 },
@@ -69,17 +69,17 @@ const lookupCustomDomain = async (host: string): Promise<string | null> => {
 export default async function proxy(req: NextRequest) {
   const url = req.nextUrl;
   const host = req.headers.get('host') || '';
-  const baseDomain = process.env.APP_DOMAIN || 'localhost:3000';
+  const hostname = host.split(':')[0];
+  const baseDomain = process.env.APP_DOMAIN || 'localhost';
 
   // Standard subdomain path — no API call needed.
-  if (host === baseDomain || host.endsWith(`.${baseDomain}`)) {
-    const subdomain = host.replace(`.${baseDomain}`, '').replace(baseDomain, '');
+  if (hostname === baseDomain || hostname.endsWith(`.${baseDomain}`)) {
+    const subdomain = hostname.replace(`.${baseDomain}`, '').replace(baseDomain, '');
     if (!subdomain || subdomain === 'www') return NextResponse.next();
     return NextResponse.rewrite(new URL(`/${subdomain}${url.pathname}${url.search}`, req.url));
   }
 
   // Custom-domain path: in-memory cache, negative cache, in-flight dedupe.
-  const hostname = host.split(':')[0];
   const slug = await lookupCustomDomain(hostname);
   if (slug) {
     return NextResponse.rewrite(new URL(`/${slug}${url.pathname}${url.search}`, req.url));

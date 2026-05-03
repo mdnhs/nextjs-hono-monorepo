@@ -59,6 +59,7 @@ app.use(
 );
 
 app.use("*", prettyJSON());
+app.use("*", resolveTenant);
 
 const PUBLIC_ROUTES = [
   { method: "GET", path: "/" },
@@ -126,8 +127,6 @@ app.use("/api/v1/*", async (c, next) => {
   return authenticate(c, next);
 });
 
-app.use("/api/v1/*", resolveTenant);
-
 app.onError((err, c) => {
   const status = err instanceof HTTPException ? err.status : 500;
   const message = err.message || "Internal Server Error";
@@ -145,6 +144,21 @@ app.onError((err, c) => {
 });
 
 app.get("/", (c) => {
+  const tenant = c.get("tenantStore");
+
+  if (tenant) {
+    return c.json({
+      message: `Welcome to ${tenant.slug}`,
+      storeId: tenant.id,
+      status: tenant.status,
+      endpoints: {
+        products: "/api/v1/storefront/products",
+        cart: "/api/v1/storefront/cart",
+        checkout: "/api/v1/storefront/checkout",
+      },
+    });
+  }
+
   return c.json({
     message: "E-commerce SaaS Platform API",
     version: "1.0.0",

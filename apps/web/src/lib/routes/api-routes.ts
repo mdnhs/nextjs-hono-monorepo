@@ -26,10 +26,10 @@ export const API_ROUTES = {
     toggleStatus: (id: string) => `/products/${id}/toggle-status`,
   },
   cart: {
-    base: '/cart',
-    summary: '/cart/summary',
-    item: (productId: string) => `/cart/${productId}`,
-    clear: '/cart/clear',
+    base: '/storefront/cart',
+    items: '/storefront/cart/items',
+    item: (itemId: string) => `/storefront/cart/items/${itemId}`,
+    checkout: '/storefront/checkout',
   },
   orders: {
     base: '/orders',
@@ -40,13 +40,13 @@ export const API_ROUTES = {
     store: (storeId: string) => `/orders/store/${storeId}`,
   },
   reviews: {
+    base: (productId: string) => `/reviews/${productId}`,
     product: (productId: string) => `/reviews/product/${productId}`,
     stats: (productId: string) => `/reviews/product/${productId}/stats`,
     my: '/reviews/my',
     details: (id: string) => `/reviews/${id}`,
     helpful: (id: string) => `/reviews/${id}/helpful`,
     canReview: (productId: string) => `/reviews/${productId}/can-review`,
-    create: (productId: string) => `/reviews/${productId}`,
   },
   categories: {
     base: '/categories',
@@ -70,6 +70,25 @@ export const API_ROUTES = {
     base: '/webhooks',
     details: (id: string) => `/webhooks/${id}`,
   },
+  themes: {
+    published: '/themes/published',
+    store: (storeId: string) => `/themes/store/${storeId}`,
+    details: (id: string) => `/themes/${id}`,
+    publish: (id: string) => `/themes/${id}/publish`,
+  },
+  staff: {
+    list: (storeId: string) => `/staff/${storeId}`,
+    invite: (storeId: string) => `/staff/${storeId}/invite`,
+  },
+  domains: {
+    check: '/domains/check',
+    request: (storeId: string) => `/domains/store/${storeId}/request`,
+  },
+  assets: {
+    list: (storeId: string) => `/assets/${storeId}`,
+    upload: (storeId: string) => `/assets/${storeId}/upload`,
+  },
+  health: '/health',
   admin: {
     dashboard: '/admin/dashboard',
     stores: '/admin/stores',
