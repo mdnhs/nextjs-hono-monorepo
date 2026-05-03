@@ -20,6 +20,9 @@ import paymentsRouter from "./routes/payments";
 import inventoryRouter from "./routes/inventory";
 import webhooksRouter from "./routes/webhooks";
 import swaggerRouter from "./routes/swagger";
+import cmsRouter from "./routes/cms";
+import staffRouter from "./routes/staff";
+import assetsRouter from "./routes/assets";
 import { resolveTenant } from "./middlewares/tenant";
 
 const app = new Hono();
@@ -169,6 +172,9 @@ app.route("/api/v1/admin", adminRouter);
 app.route("/api/v1/payments", paymentsRouter);
 app.route("/api/v1/inventory", inventoryRouter);
 app.route("/api/v1/webhooks", webhooksRouter);
+app.route("/api/v1/cms", cmsRouter);
+app.route("/api/v1/staff", staffRouter);
+app.route("/api/v1/assets", assetsRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

@@ -11,6 +11,7 @@ storesRouter.get('/', (c) => storeController.getAllStores(c))
 storesRouter.get('/my', authenticate, requirePermission(PERMISSIONS.SELLER_DASHBOARD), (c) => storeController.getUserStores(c))
 storesRouter.get('/:id', (c) => storeController.getStoreById(c))
 storesRouter.get('/slug/:slug', (c) => storeController.getStoreBySlug(c))
+storesRouter.get('/domain/:domain', (c) => storeController.getStoreByDomain(c))
 
 storesRouter.post('/', authenticate, requirePermission(PERMISSIONS.SELLER_STORES_MANAGE), (c) => storeController.createStore(c))
 storesRouter.patch('/:id', authenticate, requirePermission(PERMISSIONS.SELLER_STORES_MANAGE), requireStoreOwnership, (c) => storeController.updateStore(c))

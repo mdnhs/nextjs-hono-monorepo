@@ -15,6 +15,13 @@
       "when": 1777787115534,
       "tag": "0001_tense_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777794617209,
+      "tag": "0002_massive_zuras",
+      "breakpoints": true
     }
   ]
 }

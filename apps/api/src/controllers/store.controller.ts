@@ -64,6 +64,17 @@ export class StoreController extends BaseController {
       return this.handleError(error)
     }
   }
+
+  async getStoreByDomain(c: Context) {
+    try {
+      const domain = c.req.param('domain')!
+      const store = await storeService.getStoreByDomain(domain)
+      
+      return this.success(c, store)
+    } catch (error: any) {
+      return this.handleError(error)
+    }
+  }
   
   async getUserStores(c: Context) {
     try {

@@ -151,6 +151,19 @@ export class StoreService extends BaseService {
     }
   }
 
+  async getStoreByDomain(domain: string) {
+    const store = await db.query.stores.findFirst({
+      where: eq(stores.customDomain, domain),
+      columns: { slug: true }
+    })
+
+    if (!store) {
+      throw new Error('Store not found')
+    }
+
+    return store
+  }
+
   async getUserStores(userId: string, pagination: PaginationParams) {
     const skip = (pagination.page - 1) * pagination.limit
 

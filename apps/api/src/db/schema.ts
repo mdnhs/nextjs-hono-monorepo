@@ -537,3 +537,80 @@ export const reviewHelpfuls = pgTable('ReviewHelpful', {
   uniqueIndex('ReviewHelpful_userId_reviewId_key').on(t.userId, t.reviewId),
   index('ReviewHelpful_reviewId_idx').on(t.reviewId),
 ])
+
+export const storeStaffRoleEnum = pgEnum('StoreStaffRole', ['MANAGER', 'EDITOR', 'SUPPORT'])
+export type StoreStaffRole = (typeof storeStaffRoleEnum.enumValues)[number]
+
+export const storeStaffs = pgTable('StoreStaff', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: storeStaffRoleEnum('role').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  uniqueIndex('StoreStaff_storeId_userId_key').on(t.storeId, t.userId),
+  index('StoreStaff_storeId_idx').on(t.storeId),
+  index('StoreStaff_userId_idx').on(t.userId),
+])
+
+export const themeSettings = pgTable('ThemeSetting', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').unique().notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  colors: jsonb('colors').notNull().default({ primary: '#000000', secondary: '#ffffff' }),
+  fonts: jsonb('fonts').notNull().default({ heading: 'Inter', body: 'Inter' }),
+  layout: jsonb('layout').notNull().default({ header: 'default', footer: 'default' }),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+})
+
+export const pages = pgTable('Page', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  slug: text('slug').notNull(),
+  content: text('content'),
+  isPublished: boolean('isPublished').notNull().default(true),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  uniqueIndex('Page_storeId_slug_key').on(t.storeId, t.slug),
+  index('Page_storeId_idx').on(t.storeId),
+])
+
+export const navigations = pgTable('Navigation', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  handle: text('handle').notNull(), // e.g. 'main-menu', 'footer-menu'
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  uniqueIndex('Navigation_storeId_handle_key').on(t.storeId, t.handle),
+  index('Navigation_storeId_idx').on(t.storeId),
+])
+
+export const navigationItems = pgTable('NavigationItem', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  navigationId: text('navigationId').notNull().references(() => navigations.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  url: text('url').notNull(),
+  parentId: text('parentId'),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('NavigationItem_navigationId_idx').on(t.navigationId),
+])
+
+export const assets = pgTable('Asset', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+  url: text('url').notNull(),
+  type: text('type').notNull(), // 'IMAGE', 'VIDEO', 'DOCUMENT'
+  sizeBytes: integer('sizeBytes').notNull(),
+  fileName: text('fileName'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (t) => [
+  index('Asset_storeId_idx').on(t.storeId),
+])
