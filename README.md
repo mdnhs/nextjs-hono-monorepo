@@ -33,10 +33,12 @@ A professional multi-tenant e-commerce SaaS built with **Next.js 16** and **Hono
 | Layer | Technology |
 |-------|------------|
 | **Monorepo** | Turborepo + pnpm workspaces |
-| **Frontend** | Next.js 16 (App Router), Tailwind CSS |
+| **Frontend** | Next.js 16 (App Router), Tailwind CSS, TanStack Query |
 | **Backend** | Hono (Node.js), TypeScript, Zod |
 | **Database** | PostgreSQL (Neon), Drizzle ORM |
 | **Storage** | Cloudflare R2 |
+| **Cache & Queue** | Redis (Upstash/Self-hosted) + BullMQ |
+| **I18n** | next-intl |
 | **Validation** | Zod (Shared schemas) |
 | **Styling** | Shadcn UI + Lucide Icons |
 
@@ -48,18 +50,33 @@ A professional multi-tenant e-commerce SaaS built with **Next.js 16** and **Hono
 │   │   ├── src/
 │   │   │   ├── middlewares/      # Tenant resolution, RBAC, Idempotency
 │   │   │   ├── routes/           # CMS, Staff, Assets, Stores, Products...
-│   │   │   └── services/         # Business logic & DB transactions
+│   │   │   ├── services/         # Business logic & DB transactions
+│   │   │   └── queue/            # BullMQ workers & schedulers
 │   └── web/                      # Frontend (Next.js 16)
-│       ├── proxy.ts              # Custom domain & Subdomain middleware
-│       └── src/
-│           ├── features/         # Modular feature folders (Auth, CMS, Admin)
-│           └── services/         # API Client & Service layer
+│       ├── src/
+│       │   ├── proxy.ts          # Custom domain & Subdomain middleware
+│       │   ├── features/         # Modular feature folders (Auth, CMS, Admin)
+│       │   └── services/         # API Client & Service layer
+├── packages/
+│   ├── shared/                   # Shared Zod schemas & utility functions
+│   ├── types/                    # Shared TypeScript interfaces & DTOs
+│   ├── ui/                       # Shared UI components (Shadcn-based)
+│   ├── db/                       # Shared DB client & schema definitions
+│   └── typescript-config/        # Shared TS configuration
 ```
+
+## ⚙️ Asynchronous Processing
+
+The platform uses **BullMQ** to handle background tasks, ensuring the API remains responsive.
+- 📧 **Emails**: Transactional emails for orders, invites, and password resets.
+- 🔗 **Webhooks**: Notifying external systems of store events (e.g., `ORDER_CREATED`).
+- 🔍 **Search Indexing**: Real-time product indexing for storefront search.
+- 🧹 **Cleanup**: Periodic tasks for expiring subscriptions and abandoned carts.
 
 ## 🚥 Tenant Resolution Priority
 
-The `proxy.ts` middleware determines the tenant context in this order:
-1. **Host Header**: Exact match for `customDomain` in DB.
+The `proxy.ts` (Next.js 16 middleware) determines the tenant context in this order:
+1. **Host Header**: Exact match for `customDomain` in DB (Cached in-memory).
 2. **Subdomain**: `*.example.com` → maps to `Store.slug`.
 3. **Internal Rewrite**: Next.js rewrites the request to `/[storeSlug]/...` internally.
 
@@ -80,7 +97,12 @@ pnpm db:seed        # Seed plans & admin
 
 ### Start Development
 ```bash
+# Start all apps (Web + API + Workers)
 pnpm dev
+
+# Start specific apps
+pnpm dev:web
+pnpm dev:api
 ```
 
 ## 🔒 User Roles
