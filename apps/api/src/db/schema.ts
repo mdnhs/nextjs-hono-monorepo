@@ -141,15 +141,130 @@ export const subscriptions = pgTable('Subscription', {
 
 export const categories = pgTable('Category', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  name: text('name').unique().notNull(),
-  slug: text('slug').unique().notNull(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
   description: text('description'),
   parentId: text('parentId'),
+  storeId: text('storeId')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
   deletedAt: timestamp('deletedAt'),
 }, (t) => [
+  uniqueIndex('Category_storeId_name_key').on(t.storeId, t.name),
+  uniqueIndex('Category_storeId_slug_key').on(t.storeId, t.slug),
   index('Category_parentId_idx').on(t.parentId),
+  index('Category_storeId_idx').on(t.storeId),
+])
+
+export const locations = pgTable('Location', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  name: text('name').notNull(),
+  address: text('address'),
+  isDefault: boolean('isDefault').notNull().default(false),
+  isActive: boolean('isActive').notNull().default(true),
+  storeId: text('storeId')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+  deletedAt: timestamp('deletedAt'),
+}, (t) => [
+  index('Location_storeId_idx').on(t.storeId),
+])
+
+export const inventoryLevels = pgTable('InventoryLevel', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  variantId: text('variantId')
+    .notNull()
+    .references(() => productVariants.id, { onDelete: 'cascade' }),
+  locationId: text('locationId')
+    .notNull()
+    .references(() => locations.id, { onDelete: 'cascade' }),
+  available: integer('available').notNull().default(0),
+  reserved: integer('reserved').notNull().default(0),
+  onHand: integer('onHand').notNull().default(0), // available + reserved
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  uniqueIndex('InventoryLevel_variantId_locationId_key').on(t.variantId, t.locationId),
+  index('InventoryLevel_variantId_idx').on(t.variantId),
+  index('InventoryLevel_locationId_idx').on(t.locationId),
+])
+
+export const inventoryTransactions = pgTable('InventoryTransaction', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  inventoryLevelId: text('inventoryLevelId')
+    .notNull()
+    .references(() => inventoryLevels.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // 'ADJUSTMENT', 'SALE', 'RETURN', 'TRANSFER', 'RESERVATION'
+  quantity: integer('quantity').notNull(),
+  reason: text('reason'),
+  referenceId: text('referenceId'), // e.g. orderId
+  referenceType: text('referenceType'), // e.g. 'ORDER'
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (t) => [
+  index('InventoryTransaction_inventoryLevelId_idx').on(t.inventoryLevelId),
+])
+
+export const discounts = pgTable('Discount', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  code: text('code').notNull(),
+  type: text('type').notNull(), // 'PERCENTAGE', 'FIXED_AMOUNT', 'FREE_SHIPPING'
+  value: numeric('value', { precision: 10, scale: 2 }).notNull(),
+  valueCents: bigint('valueCents', { mode: 'bigint' }), // for FIXED_AMOUNT
+  startsAt: timestamp('startsAt').notNull(),
+  endsAt: timestamp('endsAt'),
+  usageLimit: integer('usageLimit'),
+  usageCount: integer('usageCount').notNull().default(0),
+  minOrderAmountCents: bigint('minOrderAmountCents', { mode: 'bigint' }),
+  isActive: boolean('isActive').notNull().default(true),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+  deletedAt: timestamp('deletedAt'),
+}, (t) => [
+  uniqueIndex('Discount_storeId_code_key').on(t.storeId, t.code),
+  index('Discount_storeId_idx').on(t.storeId),
+])
+
+export const shippingRates = pgTable('ShippingRate', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: text('type').notNull(), // 'FLAT', 'WEIGHT_BASED', 'PRICE_BASED'
+  priceCents: bigint('priceCents', { mode: 'bigint' }).notNull(),
+  minWeightGrams: integer('minWeightGrams'),
+  maxWeightGrams: integer('maxWeightGrams'),
+  minOrderAmountCents: bigint('minOrderAmountCents', { mode: 'bigint' }),
+  maxOrderAmountCents: bigint('maxOrderAmountCents', { mode: 'bigint' }),
+  isActive: boolean('isActive').notNull().default(true),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('ShippingRate_storeId_idx').on(t.storeId),
+])
+
+export const taxRates = pgTable('TaxRate', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  storeId: text('storeId')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  percentage: numeric('percentage', { precision: 5, scale: 2 }).notNull(),
+  country: text('country').notNull(),
+  state: text('state'),
+  zip: text('zip'),
+  isInclusive: boolean('isInclusive').notNull().default(false),
+  isActive: boolean('isActive').notNull().default(true),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (t) => [
+  index('TaxRate_storeId_idx').on(t.storeId),
 ])
 
 export const products = pgTable('Product', {
@@ -163,7 +278,6 @@ export const products = pgTable('Product', {
   currency: text('currency'),
   images: text('images').array().notNull().default([]),
   sku: text('sku').unique().notNull(),
-  quantity: integer('quantity').notNull().default(0),
   isActive: boolean('isActive').notNull().default(true),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull().$onUpdateFn(() => new Date()),
@@ -193,8 +307,6 @@ export const productVariants = pgTable('ProductVariant', {
   currency: text('currency').notNull().default('USD'),
   // Legacy mirror of priceCents.
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
-  // Inventory mirrored from inventory_levels (added in step 7).
-  quantity: integer('quantity').notNull().default(0),
   weightGrams: integer('weightGrams'),
   barcode: text('barcode'),
   isDefault: boolean('isDefault').notNull().default(false),

@@ -25,8 +25,10 @@ export class ProductController extends BaseController {
     try {
       const { page, limit } = this.getPaginationParams(c)
       const isActiveParam = c.req.query('isActive')
+      const tenant = c.get('tenantStore')
+      
       const filters = {
-        storeId: c.req.query('storeId'),
+        storeId: tenant?.id ?? c.req.query('storeId'),
         categoryId: c.req.query('categoryId'),
         isActive: isActiveParam !== undefined ? isActiveParam === 'true' : true,
         minPrice: c.req.query('minPrice') ? parseFloat(c.req.query('minPrice')!) : undefined,

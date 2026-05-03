@@ -19,6 +19,12 @@ import {
   refunds,
   webhooks,
   webhookDeliveries,
+  locations,
+  inventoryLevels,
+  inventoryTransactions,
+  discounts,
+  taxRates,
+  shippingRates,
 } from './schema'
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -43,6 +49,38 @@ export const storesRelations = relations(stores, ({ one, many }) => ({
   orders: many(orders),
   subscriptions: many(subscriptions),
   customers: many(customers),
+  locations: many(locations),
+  discounts: many(discounts),
+  taxRates: many(taxRates),
+  shippingRates: many(shippingRates),
+  categories: many(categories),
+}))
+
+export const locationsRelations = relations(locations, ({ one, many }) => ({
+  store: one(stores, { fields: [locations.storeId], references: [stores.id] }),
+  inventoryLevels: many(inventoryLevels),
+}))
+
+export const inventoryLevelsRelations = relations(inventoryLevels, ({ one, many }) => ({
+  variant: one(productVariants, { fields: [inventoryLevels.variantId], references: [productVariants.id] }),
+  location: one(locations, { fields: [inventoryLevels.locationId], references: [locations.id] }),
+  transactions: many(inventoryTransactions),
+}))
+
+export const inventoryTransactionsRelations = relations(inventoryTransactions, ({ one }) => ({
+  inventoryLevel: one(inventoryLevels, { fields: [inventoryTransactions.inventoryLevelId], references: [inventoryLevels.id] }),
+}))
+
+export const discountsRelations = relations(discounts, ({ one }) => ({
+  store: one(stores, { fields: [discounts.storeId], references: [stores.id] }),
+}))
+
+export const taxRatesRelations = relations(taxRates, ({ one }) => ({
+  store: one(stores, { fields: [taxRates.storeId], references: [stores.id] }),
+}))
+
+export const shippingRatesRelations = relations(shippingRates, ({ one }) => ({
+  store: one(stores, { fields: [shippingRates.storeId], references: [stores.id] }),
 }))
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -58,6 +96,7 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
   }),
   children: many(categories, { relationName: 'CategoryChildren' }),
   products: many(products),
+  store: one(stores, { fields: [categories.storeId], references: [stores.id] }),
 }))
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -73,6 +112,7 @@ export const productVariantsRelations = relations(productVariants, ({ one, many 
   product: one(products, { fields: [productVariants.productId], references: [products.id] }),
   cartItems: many(cartItems),
   orderItems: many(orderItems),
+  inventoryLevels: many(inventoryLevels),
 }))
 
 export const cartsRelations = relations(carts, ({ one, many }) => ({

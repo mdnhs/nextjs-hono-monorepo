@@ -10,7 +10,18 @@
 
 import type { Context } from 'hono'
 import { db } from '.'
-import { products, productVariants, orders, customers } from './schema'
+import {
+  products,
+  productVariants,
+  orders,
+  customers,
+  locations,
+  inventoryLevels,
+  discounts,
+  taxRates,
+  shippingRates,
+  categories,
+} from './schema'
 import { and, eq } from 'drizzle-orm'
 
 const mergeWhere = (args: any, storeFilter: any): any => {
@@ -51,7 +62,42 @@ export const tenantRepo = (storeId: string) => {
         db.query.customers.findFirst(mergeWhere(args, eq(customers.storeId, storeId))),
     },
 
-    // Variants/order-items/cart-items inherit tenant via parent. Use these asserts
+    locations: {
+      findMany: (args?: Parameters<typeof db.query.locations.findMany>[0]) =>
+        db.query.locations.findMany(mergeWhere(args, eq(locations.storeId, storeId))),
+      findFirst: (args?: Parameters<typeof db.query.locations.findFirst>[0]) =>
+        db.query.locations.findFirst(mergeWhere(args, eq(locations.storeId, storeId))),
+    },
+
+    discounts: {
+      findMany: (args?: Parameters<typeof db.query.discounts.findMany>[0]) =>
+        db.query.discounts.findMany(mergeWhere(args, eq(discounts.storeId, storeId))),
+      findFirst: (args?: Parameters<typeof db.query.discounts.findFirst>[0]) =>
+        db.query.discounts.findFirst(mergeWhere(args, eq(discounts.storeId, storeId))),
+    },
+
+    taxRates: {
+      findMany: (args?: Parameters<typeof db.query.taxRates.findMany>[0]) =>
+        db.query.taxRates.findMany(mergeWhere(args, eq(taxRates.storeId, storeId))),
+      findFirst: (args?: Parameters<typeof db.query.taxRates.findFirst>[0]) =>
+        db.query.taxRates.findFirst(mergeWhere(args, eq(taxRates.storeId, storeId))),
+    },
+
+    shippingRates: {
+      findMany: (args?: Parameters<typeof db.query.shippingRates.findMany>[0]) =>
+        db.query.shippingRates.findMany(mergeWhere(args, eq(shippingRates.storeId, storeId))),
+      findFirst: (args?: Parameters<typeof db.query.shippingRates.findFirst>[0]) =>
+        db.query.shippingRates.findFirst(mergeWhere(args, eq(shippingRates.storeId, storeId))),
+    },
+
+    categories: {
+      findMany: (args?: Parameters<typeof db.query.categories.findMany>[0]) =>
+        db.query.categories.findMany(mergeWhere(args, eq(categories.storeId, storeId))),
+      findFirst: (args?: Parameters<typeof db.query.categories.findFirst>[0]) =>
+        db.query.categories.findFirst(mergeWhere(args, eq(categories.storeId, storeId))),
+    },
+
+    // Variants inherit tenant via parent. Use these asserts
     // at boundaries before mutating.
     assertProductInStore: async (productId: string) => {
       const p = await db.query.products.findFirst({
@@ -66,6 +112,13 @@ export const tenantRepo = (storeId: string) => {
         with: { product: { columns: { storeId: true } } },
       })
       if (!v || v.product.storeId !== storeId) throw new Error('Variant not in this store')
+    },
+    assertLocationInStore: async (locationId: string) => {
+      const l = await db.query.locations.findFirst({
+        where: and(eq(locations.id, locationId), eq(locations.storeId, storeId)),
+        columns: { id: true },
+      })
+      if (!l) throw new Error('Location not in this store')
     },
   }
 }

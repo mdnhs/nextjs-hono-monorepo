@@ -413,6 +413,8 @@ const routes: RouteInfo[] = [
           phone: { type: 'string' },
         },
       },
+      discountCode: { type: 'string', description: 'Coupon code to apply' },
+      locationId: { type: 'string', description: 'Fulfillment location ID. Defaults to store default location.' },
     },
     responses: {
       '201': { description: 'Order created' },
@@ -1046,6 +1048,146 @@ const routes: RouteInfo[] = [
       '200': { description: 'List of store orders' },
     },
   },
+  // Payments
+  {
+    path: '/api/v1/payments/initiate',
+    method: 'post',
+    tags: ['Payments'],
+    summary: 'Initiate a payment',
+    requiresAuth: true,
+    requestBody: {
+      orderId: { type: 'string' },
+      provider: { type: 'string', enum: ['STRIPE', 'SSLCOMMERZ', 'MANUAL'] },
+      successUrl: { type: 'string', format: 'uri' },
+      cancelUrl: { type: 'string', format: 'uri' },
+      customerEmail: { type: 'string', format: 'email' },
+    },
+    responses: {
+      '200': { description: 'Payment initiated' },
+    },
+  },
+  {
+    path: '/api/v1/payments/refund',
+    method: 'post',
+    tags: ['Payments'],
+    summary: 'Refund a payment',
+    requiresAuth: true,
+    requestBody: {
+      paymentId: { type: 'string' },
+      amountCents: { type: 'integer' },
+      reason: { type: 'string' },
+    },
+    responses: {
+      '200': { description: 'Refund successful' },
+    },
+  },
+  {
+    path: '/api/v1/payments/webhooks/{provider}',
+    method: 'post',
+    tags: ['Payments'],
+    summary: 'Provider webhooks',
+    params: {
+      provider: { type: 'string', description: 'Payment provider (stripe, sslcommerz)' },
+    },
+    responses: {
+      '200': { description: 'Webhook processed' },
+    },
+  },
+
+  // Inventory
+  {
+    path: '/api/v1/inventory/locations',
+    method: 'get',
+    tags: ['Inventory'],
+    summary: 'Get store locations',
+    requiresAuth: true,
+    responses: {
+      '200': { description: 'List of locations' },
+    },
+  },
+  {
+    path: '/api/v1/inventory/locations',
+    method: 'post',
+    tags: ['Inventory'],
+    summary: 'Create a location',
+    requiresAuth: true,
+    requestBody: {
+      name: { type: 'string' },
+      address: { type: 'string' },
+      isDefault: { type: 'boolean' },
+    },
+    responses: {
+      '201': { description: 'Location created' },
+    },
+  },
+  {
+    path: '/api/v1/inventory/levels',
+    method: 'get',
+    tags: ['Inventory'],
+    summary: 'Get inventory levels for variant',
+    requiresAuth: true,
+    query: {
+      variantId: { type: 'string', description: 'Variant ID' },
+    },
+    responses: {
+      '200': { description: 'Inventory levels' },
+    },
+  },
+  {
+    path: '/api/v1/inventory/adjust',
+    method: 'post',
+    tags: ['Inventory'],
+    summary: 'Adjust inventory level',
+    requiresAuth: true,
+    requestBody: {
+      variantId: { type: 'string' },
+      locationId: { type: 'string' },
+      delta: { type: 'integer', description: 'Change in quantity' },
+      reason: { type: 'string' },
+    },
+    responses: {
+      '200': { description: 'Inventory adjusted' },
+    },
+  },
+
+  // Webhooks
+  {
+    path: '/api/v1/webhooks',
+    method: 'get',
+    tags: ['Webhooks'],
+    summary: 'Get registered webhooks',
+    requiresAuth: true,
+    responses: {
+      '200': { description: 'List of webhooks' },
+    },
+  },
+  {
+    path: '/api/v1/webhooks',
+    method: 'post',
+    tags: ['Webhooks'],
+    summary: 'Register a webhook',
+    requiresAuth: true,
+    requestBody: {
+      topic: { type: 'string', description: 'Event topic (e.g. order.created)' },
+      url: { type: 'string', format: 'uri' },
+    },
+    responses: {
+      '201': { description: 'Webhook registered' },
+    },
+  },
+  {
+    path: '/api/v1/webhooks/{id}',
+    method: 'delete',
+    tags: ['Webhooks'],
+    summary: 'Delete a webhook',
+    requiresAuth: true,
+    params: {
+      id: { type: 'string', description: 'Webhook ID' },
+    },
+    responses: {
+      '200': { description: 'Webhook deleted' },
+    },
+  },
 ]
 
 export function generateOpenAPISpec(): OpenAPIV3.Document {
@@ -1080,6 +1222,9 @@ export function generateOpenAPISpec(): OpenAPIV3.Document {
       { name: 'Plans', description: 'Subscription plans' },
       { name: 'Admin', description: 'Admin operations' },
       { name: 'Subscriptions', description: 'Store subscriptions' },
+      { name: 'Payments', description: 'Payment processing' },
+      { name: 'Inventory', description: 'Multi-location inventory' },
+      { name: 'Webhooks', description: 'Outbound webhooks' },
     ],
     paths: buildPaths(),
     components: {

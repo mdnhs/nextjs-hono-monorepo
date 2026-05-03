@@ -9,6 +9,10 @@ import categoryRoutes from './routes/category.routes'
 import planRouter from './routes/plans'
 import adminRouter from './routes/admin'
 
+import paymentsRouter from './routes/payments'
+import inventoryRouter from './routes/inventory'
+import webhooksRouter from './routes/webhooks'
+
 // Create API app for type export
 const api = new Hono()
   .get('/health', (c) => c.json({ status: 'healthy', timestamp: new Date().toISOString() }))
@@ -21,6 +25,9 @@ const api = new Hono()
   .route('/categories', categoryRoutes)
   .route('/plans', planRouter)
   .route('/admin', adminRouter)
+  .route('/payments', paymentsRouter)
+  .route('/inventory', inventoryRouter)
+  .route('/webhooks', webhooksRouter)
 
 export type ApiType = typeof api
 

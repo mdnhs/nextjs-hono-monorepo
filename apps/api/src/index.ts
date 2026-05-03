@@ -17,6 +17,8 @@ import categoryRoutes from "./routes/category.routes";
 import planRouter from "./routes/plans";
 import adminRouter from "./routes/admin";
 import paymentsRouter from "./routes/payments";
+import inventoryRouter from "./routes/inventory";
+import webhooksRouter from "./routes/webhooks";
 import swaggerRouter from "./routes/swagger";
 import { resolveTenant } from "./middlewares/tenant";
 
@@ -142,6 +144,9 @@ app.get("/", (c) => {
       categories: "/api/v1/categories",
       plans: "/api/v1/plans",
       admin: "/api/v1/admin",
+      payments: "/api/v1/payments",
+      inventory: "/api/v1/inventory",
+      webhooks: "/api/v1/webhooks",
       swagger: "/swagger/ui",
       openapi: "/swagger/doc",
     },
@@ -162,6 +167,8 @@ app.route("/api/v1/categories", categoryRoutes);
 app.route("/api/v1/plans", planRouter);
 app.route("/api/v1/admin", adminRouter);
 app.route("/api/v1/payments", paymentsRouter);
+app.route("/api/v1/inventory", inventoryRouter);
+app.route("/api/v1/webhooks", webhooksRouter);
 app.route("/swagger", swaggerRouter);
 
 const port = parseInt(process.env.PORT || "3000");

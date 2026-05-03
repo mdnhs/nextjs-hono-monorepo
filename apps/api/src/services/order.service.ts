@@ -26,13 +26,21 @@ export interface OrderFilters {
   storeOwnerId?: string
 }
 
+import { inventoryService } from './inventory.service'
+import { calculationService } from './calculation.service'
+import { toCents, centsToNumericString } from '../utils/money'
+import { locations } from '../db/schema'
+
 export class OrderService extends BaseService {
-  async createOrder(userId: string, data: CreateOrderData) {
+  async createOrder(userId: string, data: CreateOrderData & { discountCode?: string; locationId?: string }) {
     const cart = await cartService.getOrCreateCart(userId)
 
     if (cart.items.length === 0) {
       throw new Error('Cart is empty')
     }
+
+    // Default to the store's default location if not provided
+    let locationId = data.locationId
 
     const storeOrders = new Map<string, any[]>()
 
@@ -47,36 +55,45 @@ export class OrderService extends BaseService {
     const createdOrders = []
 
     for (const [storeId, items] of storeOrders) {
-      const orderTotal = items.reduce((sum, item) => sum + item.subtotal, 0)
+      // 1. Resolve Location
+      if (!locationId) {
+        const defaultLoc = await db.query.locations.findFirst({
+          where: and(eq(locations.storeId, storeId), eq(locations.isDefault, true))
+        })
+        if (!defaultLoc) throw new Error(`No default location found for store ${storeId}`)
+        locationId = defaultLoc.id
+      }
+
+      // 2. Calculate Totals
+      const calcResult = await calculationService.calculate(storeId, {
+        items: items.map(i => ({
+          priceCents: i.product.priceCents,
+          quantity: i.quantity,
+          productId: i.product.id
+        })),
+        discountCode: data.discountCode
+      })
 
       const order = await db.transaction(async (tx) => {
+        // 3. Reserve Inventory
         for (const item of items) {
-          const product = await tx.query.products.findFirst({
-            where: eq(products.id, item.product.id),
+          await inventoryService.reserve({
+            variantId: item.variantId ?? 'default', // Fallback for legacy
+            locationId: locationId!,
+            quantity: item.quantity,
+            reason: 'Order Created',
           })
-
-          if (!product) {
-            throw new Error(`Product ${item.product.name} not found`)
-          }
-
-          if (product.quantity < item.quantity) {
-            throw new Error(
-              `Insufficient stock for ${product.name}. Available: ${product.quantity}`
-            )
-          }
-
-          await tx
-            .update(products)
-            .set({ quantity: product.quantity - item.quantity })
-            .where(eq(products.id, product.id))
         }
 
+        // 4. Create Order record
         const [createdOrder] = await tx
           .insert(orders)
           .values({
             userId,
             storeId,
-            total: String(orderTotal),
+            total: centsToNumericString(calcResult.totalCents),
+            totalCents: calcResult.totalCents,
+            currency: items[0].product.currency ?? 'USD',
             status: 'PENDING',
           })
           .returning()
@@ -85,8 +102,11 @@ export class OrderService extends BaseService {
           items.map((item: any) => ({
             orderId: createdOrder.id,
             productId: item.product.id,
+            variantId: item.variantId,
             quantity: item.quantity,
-            price: String(item.product.price),
+            price: item.product.price,
+            priceCents: item.product.priceCents,
+            currency: item.product.currency,
           }))
         )
 

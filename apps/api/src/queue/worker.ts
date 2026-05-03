@@ -28,11 +28,41 @@ const webhookWorker = new Worker<WebhookJob>(
   { connection: getRedis(), concurrency },
 )
 
+import { searchService } from '../services/search.service'
+import { db } from '../db'
+import { products, categories } from '../db/schema'
+import { eq } from 'drizzle-orm'
+
 const searchWorker = new Worker<SearchIndexJob>(
   QUEUE_NAMES.SEARCH_INDEX,
   async (job: Job<SearchIndexJob>) => {
-    console.log('[search-index]', job.data.op, job.data.productId)
-    // TODO: tsvector update / Meilisearch sync (step 9)
+    const { op, productId } = job.data
+    console.log('[search-index]', op, productId)
+
+    if (op === 'DELETE') {
+      await searchService.deleteProduct(productId)
+      return
+    }
+
+    const p = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: { category: { columns: { name: true } } },
+    })
+
+    if (!p) return
+
+    await searchService.indexProduct({
+      id: p.id,
+      storeId: p.storeId,
+      name: p.name,
+      description: p.description,
+      priceCents: Number(p.priceCents ?? 0),
+      currency: p.currency,
+      images: p.images,
+      sku: p.sku,
+      categoryName: p.category?.name ?? null,
+      isActive: p.isActive,
+    })
   },
   { connection: getRedis(), concurrency },
 )
